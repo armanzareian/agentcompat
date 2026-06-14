@@ -1,0 +1,155 @@
+[
+  {
+    "name": "pattern",
+    "schema": {"type": "string", "pattern": "^[A-Z]{2}[0-9]{2}$"},
+    "valid": ["AB12", "ZZ99"],
+    "invalid": ["ab12", "ABC12", "AB1"]
+  },
+  {
+    "name": "date-time format",
+    "schema": {"type": "string", "format": "date-time"},
+    "valid": ["2026-06-13T12:00:00Z", "2026-06-13T12:00:00-07:00"],
+    "invalid": [
+      "2026-06-13 12:00:00+00:00",
+      "2026-06-13T12:00:00",
+      "2026-13-40T12:00:00Z"
+    ]
+  },
+  {
+    "name": "date format",
+    "schema": {"type": "string", "format": "date"},
+    "valid": ["2024-02-29", "2026-06-13"],
+    "invalid": ["2023-02-29", "2026-13-01", "13-06-2026"]
+  },
+  {
+    "name": "network formats",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "ipv4": {"type": "string", "format": "ipv4"},
+        "ipv6": {"type": "string", "format": "ipv6"},
+        "uri": {"type": "string", "format": "uri"}
+      },
+      "required": ["ipv4", "ipv6", "uri"]
+    },
+    "valid": [
+      {"ipv4": "127.0.0.1", "ipv6": "::1", "uri": "https://example.com/x"},
+      {"ipv4": "192.168.1.1", "ipv6": "2001:db8::1", "uri": "mailto:a@example.com"}
+    ],
+    "invalid": [
+      {"ipv4": "999.0.0.1", "ipv6": "::1", "uri": "https://example.com"},
+      {"ipv4": "127.0.0.1", "ipv6": "not-ipv6", "uri": "https://example.com"},
+      {"ipv4": "127.0.0.1", "ipv6": "::1", "uri": "relative/path"}
+    ]
+  },
+  {
+    "name": "identity formats",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "email": {"type": "string", "format": "email"},
+        "host": {"type": "string", "format": "hostname"},
+        "id": {"type": "string", "format": "uuid"}
+      },
+      "required": ["email", "host", "id"]
+    },
+    "valid": [
+      {
+        "email": "a@example.com",
+        "host": "api.example.com",
+        "id": "123e4567-e89b-12d3-a456-426614174000"
+      },
+      {
+        "email": "build+ci@example.org",
+        "host": "localhost",
+        "id": "16fd2706-8baf-433b-82eb-8c7fada847da"
+      }
+    ],
+    "invalid": [
+      {
+        "email": "missing-at.example.com",
+        "host": "api.example.com",
+        "id": "123e4567-e89b-12d3-a456-426614174000"
+      },
+      {
+        "email": "a@example.com",
+        "host": "bad_host",
+        "id": "123e4567-e89b-12d3-a456-426614174000"
+      },
+      {"email": "a@example.com", "host": "api.example.com", "id": "not-a-uuid"}
+    ]
+  },
+  {
+    "name": "conditional branches",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "kind": {"enum": ["email", "sms"]},
+        "address": {"type": "string"},
+        "phone": {"type": "string"}
+      },
+      "required": ["kind"],
+      "if": {"properties": {"kind": {"const": "email"}}, "required": ["kind"]},
+      "then": {"required": ["address"]},
+      "else": {"required": ["phone"]}
+    },
+    "valid": [
+      {"kind": "email", "address": "a@example.com"},
+      {"kind": "sms", "phone": "+15551234567"}
+    ],
+    "invalid": [
+      {"kind": "email"},
+      {"kind": "sms"},
+      {"kind": "push", "phone": "+15551234567"}
+    ]
+  },
+  {
+    "name": "prefix items",
+    "schema": {
+      "type": "array",
+      "prefixItems": [{"type": "string"}, {"type": "integer"}],
+      "items": false
+    },
+    "valid": [["event"], ["event", 2]],
+    "invalid": [["event", "2"], ["event", 2, true], [1, 2]]
+  },
+  {
+    "name": "legacy tuple items",
+    "schema": {
+      "type": "array",
+      "items": [{"type": "string"}, {"type": "integer"}],
+      "additionalItems": false
+    },
+    "valid": [["event"], ["event", 2]],
+    "invalid": [["event", "2"], ["event", 2, true], [1, 2]]
+  },
+  {
+    "name": "multiple of",
+    "schema": {"type": "number", "multipleOf": 0.25},
+    "valid": [0, 1.5],
+    "invalid": [0.3, 0.26, -0.1]
+  },
+  {
+    "name": "unique items",
+    "schema": {"type": "array", "uniqueItems": true},
+    "valid": [[1, true], [{"a": 1}, {"a": 2}]],
+    "invalid": [[1, 1.0], [{"a": 1}, {"a": 1}], ["x", "x"]]
+  },
+  {
+    "name": "one of",
+    "schema": {
+      "oneOf": [
+        {"type": "string", "pattern": "^x"},
+        {"type": "integer", "minimum": 1}
+      ]
+    },
+    "valid": ["xray", 2],
+    "invalid": ["no", 0, true]
+  },
+  {
+    "name": "false schema",
+    "schema": false,
+    "valid": [],
+    "invalid": [null, true, 1, "value", {"x": 1}]
+  }
+]

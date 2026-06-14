@@ -1,10 +1,16 @@
-.PHONY: demo eval quality test
+.PHONY: audit demo eval quality test
 
 test:
 	PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 quality:
 	python3 scripts/quality.py
+
+audit:
+	PYTHONPATH=src python3 -m agentcompat audit \
+		--schema examples/order-api/baseline.json
+	PYTHONPATH=src python3 -m agentcompat audit \
+		--schema examples/order-api/candidate.json
 
 demo:
 	PYTHONPATH=src python3 -m agentcompat check \

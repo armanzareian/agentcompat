@@ -42,22 +42,14 @@ def render_text(report: CompatibilityReport) -> str:
     lines = [
         "AgentCompat compatibility report",
         f"Score: {report.score:.2f}/100",
-        (
-            f"Calls: {report.passed} passed, {report.broken} broken, "
-            f"{report.excluded} excluded"
-        ),
-        (
-            f"Observed weight: {report.passing_weight:g}/"
-            f"{report.eligible_weight:g} compatible"
-        ),
+        (f"Calls: {report.passed} passed, {report.broken} broken, {report.excluded} excluded"),
+        (f"Observed weight: {report.passing_weight:g}/{report.eligible_weight:g} compatible"),
     ]
     for result in report.results:
         if result.status == "passed":
             continue
         lines.append("")
-        lines.append(
-            f"{result.status.upper()} {result.trace.trace_id} -> {result.trace.tool}"
-        )
+        lines.append(f"{result.status.upper()} {result.trace.trace_id} -> {result.trace.tool}")
         for issue in result.issues:
             lines.append(f"  [{issue.code}] {issue.path}: {issue.message}")
         for hint in result.hints:

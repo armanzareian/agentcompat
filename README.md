@@ -24,11 +24,10 @@ for local development and CI.
 - **Measurable evaluation:** labeled suites report precision, recall, F1, and root-cause accuracy.
 - **Provider-neutral input:** normalize MCP-style and OpenAI-style tool bundles.
 
-AgentCompat does not claim to replace a complete JSON Schema implementation. Version 0.1
-implements the common validation subset used by function tools: primitive and container types,
-properties, required fields, closed objects, enums, constants, numeric and length bounds,
-array items, and `allOf`/`anyOf`/`oneOf`. Unsupported validation keywords are outside the
-current score and are scheduled for explicit coverage reporting in the next milestone.
+AgentCompat does not claim to replace a complete JSON Schema implementation. It implements a
+tested subset used by function tools, resolves sandboxed local references, and refuses to score
+schemas containing unsupported semantics. See the [JSON Schema support matrix](docs/schema-support.md)
+for the exact keyword and format inventory.
 
 ## Quickstart
 
@@ -62,6 +61,15 @@ Run the labeled evaluation:
 agentcompat eval --suite examples/order-api/suite.json
 ```
 
+Audit a tool bundle before replay:
+
+```bash
+agentcompat audit --schema examples/order-api/candidate.json
+```
+
+The audit reports every unsupported keyword with its schema path. `check` performs the same
+preflight automatically and returns exit code `2` instead of producing a misleading score.
+
 ## Inputs
 
 Tool bundles may use MCP-style `inputSchema`:
@@ -88,8 +96,9 @@ OpenAI-style `function.parameters` is also accepted. Traces are JSON Lines:
 ```
 
 `weight` defaults to `1.0` and must be positive. Inputs are capped at 10 MiB per file and
-10,000 traces by default. AgentCompat performs no network requests and never executes trace
-content.
+10,000 traces by default. Local `$ref` files must remain beneath the bundle directory;
+traversal, remote references, missing pointers, and cycles are rejected. AgentCompat performs
+no network requests and never executes trace content.
 
 ## Output
 

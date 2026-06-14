@@ -9,9 +9,7 @@ def evaluate_report(
 ) -> EvaluationMetrics:
     expected_ids = set(expected_breakages)
     broken_results = {
-        result.trace.trace_id: result
-        for result in report.results
-        if result.status == "broken"
+        result.trace.trace_id: result for result in report.results if result.status == "broken"
     }
     predicted_ids = set(broken_results)
 

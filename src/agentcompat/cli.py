@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from agentcompat.analyzer import analyze_compatibility
 from agentcompat.evaluation import evaluate_report
@@ -15,6 +15,10 @@ from agentcompat.report import (
     render_text,
     report_to_dict,
 )
+from agentcompat.validator import (
+    UnsupportedSchemaError,
+    audit_tool_bundle,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -23,9 +27,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "check":
             return _run_check(args)
+        if args.command == "audit":
+            return _run_audit(args)
         if args.command == "eval":
             return _run_evaluation(args)
-    except InputError as exc:
+    except (InputError, UnsupportedSchemaError) as exc:
         print(f"agentcompat: {exc}", file=sys.stderr)
         return 2
     parser.error("a command is required")
@@ -48,6 +54,13 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--fail-under", type=_score, default=100.0)
     check.add_argument("--max-traces", type=int, default=10_000)
 
+    audit = subparsers.add_parser(
+        "audit",
+        help="inventory unsupported JSON Schema semantics",
+    )
+    audit.add_argument("--schema", type=Path, required=True)
+    audit.add_argument("--format", choices=("text", "json"), default="text")
+
     evaluate = subparsers.add_parser("eval", help="run a labeled evaluation suite")
     evaluate.add_argument("--suite", type=Path, required=True)
     evaluate.add_argument("--format", choices=("text", "json"), default="text")
@@ -65,6 +78,35 @@ def _run_check(args: argparse.Namespace) -> int:
     else:
         print(render_text(report))
     return 0 if report.score >= args.fail_under else 1
+
+
+def _run_audit(args: argparse.Namespace) -> int:
+    issues = audit_tool_bundle(load_tool_bundle(args.schema))
+    if args.format == "json":
+        print(
+            json.dumps(
+                {
+                    "supported": not issues,
+                    "unsupported": [
+                        {
+                            "keyword": issue.keyword,
+                            "schema_path": issue.schema_path,
+                        }
+                        for issue in issues
+                    ],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        if not issues:
+            print("All encountered JSON Schema keywords are supported.")
+        else:
+            print("Unsupported JSON Schema semantics:")
+            for issue in issues:
+                print(f"- {issue.keyword} at {issue.schema_path}")
+    return 0 if not issues else 1
 
 
 def _run_evaluation(args: argparse.Namespace) -> int:

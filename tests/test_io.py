@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agentcompat.io import InputError, parse_tool_bundle, read_traces
+from agentcompat.io import InputError, load_tool_bundle, parse_tool_bundle, read_traces
 
 
 class ToolBundleTests(unittest.TestCase):
@@ -36,6 +36,154 @@ class ToolBundleTests(unittest.TestCase):
             set(tools),
         )
         self.assertEqual(["status"], tools["search_orders"]["required"])
+
+    def test_resolves_internal_and_local_file_references(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "shared.json").write_text(
+                json.dumps(
+                    {
+                        "$defs": {
+                            "query": {
+                                "type": "string",
+                                "pattern": "^[a-z]+$",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            bundle = root / "bundle.json"
+            bundle.write_text(
+                json.dumps(
+                    {
+                        "$defs": {"limit": {"type": "integer", "minimum": 1}},
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "query": {
+                                            "$ref": "shared.json#/$defs/query",
+                                        },
+                                        "limit": {"$ref": "#/$defs/limit"},
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            tools = load_tool_bundle(bundle)
+
+        self.assertEqual(
+            {"type": "string", "pattern": "^[a-z]+$"},
+            tools["search"]["properties"]["query"],
+        )
+        self.assertEqual(
+            {"type": "integer", "minimum": 1},
+            tools["search"]["properties"]["limit"],
+        )
+
+    def test_rejects_reference_traversal_outside_schema_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root.parent / "outside-agentcompat-schema.json"
+            outside.write_text('{"type":"string"}', encoding="utf-8")
+            bundle = root / "bundle.json"
+            bundle.write_text(
+                json.dumps(
+                    {
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {"$ref": "../outside-agentcompat-schema.json"},
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            try:
+                with self.assertRaisesRegex(InputError, "outside schema root"):
+                    load_tool_bundle(bundle)
+            finally:
+                outside.unlink(missing_ok=True)
+
+    def test_rejects_reference_cycles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "bundle.json"
+            bundle.write_text(
+                json.dumps(
+                    {
+                        "$defs": {
+                            "a": {"$ref": "#/$defs/b"},
+                            "b": {"$ref": "#/$defs/a"},
+                        },
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {"$ref": "#/$defs/a"},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(InputError, "cycle"):
+                load_tool_bundle(bundle)
+
+    def test_rejects_invalid_reference_targets(self) -> None:
+        cases = [
+            ("https://example.com/schema.json", "Only local file"),
+            ("#named-anchor", "non-pointer fragment"),
+            ("#/$defs/missing", "missing location"),
+            ("#/$defs/value", "does not point to a schema"),
+            ("#/$defs/values/4", "outside an array"),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "bundle.json"
+            for reference, message in cases:
+                with self.subTest(reference=reference):
+                    bundle.write_text(
+                        json.dumps(
+                            {
+                                "$defs": {
+                                    "value": "not-a-schema",
+                                    "values": [{"type": "string"}],
+                                },
+                                "tools": [
+                                    {
+                                        "name": "search",
+                                        "inputSchema": {"$ref": reference},
+                                    }
+                                ],
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(InputError, message):
+                        load_tool_bundle(bundle)
+
+            bundle.write_text(
+                json.dumps(
+                    {
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {"$ref": 42},
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(InputError, "must be strings"):
+                load_tool_bundle(bundle)
 
 
 class TraceReaderTests(unittest.TestCase):

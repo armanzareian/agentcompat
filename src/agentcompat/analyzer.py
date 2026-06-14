@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from agentcompat.models import (
     CompatibilityReport,
@@ -8,7 +9,11 @@ from agentcompat.models import (
     TraceResult,
     ValidationIssue,
 )
-from agentcompat.validator import validate_instance
+from agentcompat.validator import (
+    UnsupportedSchemaError,
+    audit_tool_bundle,
+    validate_instance,
+)
 
 
 def analyze_compatibility(
@@ -16,6 +21,10 @@ def analyze_compatibility(
     candidate: dict[str, dict[str, Any]],
     traces: Iterable[ToolCall],
 ) -> CompatibilityReport:
+    unsupported = audit_tool_bundle(baseline) + audit_tool_bundle(candidate)
+    if unsupported:
+        raise UnsupportedSchemaError(unsupported)
+
     results: list[TraceResult] = []
     eligible_weight = 0.0
     passing_weight = 0.0
@@ -45,13 +54,12 @@ def analyze_compatibility(
         baseline_issues = validate_instance(trace.arguments, baseline_schema)
         if baseline_issues:
             excluded += 1
-            results.append(
-                TraceResult(trace, "excluded", tuple(baseline_issues))
-            )
+            results.append(TraceResult(trace, "excluded", tuple(baseline_issues)))
             continue
 
         eligible_weight += trace.weight
         candidate_schema = candidate.get(trace.tool)
+        issues: tuple[ValidationIssue, ...]
         if candidate_schema is None:
             issues = (
                 ValidationIssue(
@@ -101,15 +109,9 @@ def _repair_hint(issue: ValidationIssue) -> str:
         "unexpected_property": (
             f"Remove or rename {issue.path}, or allow it in additionalProperties."
         ),
-        "type_mismatch": (
-            f"Coerce {issue.path} to {issue.expected!r} before invoking the tool."
-        ),
-        "enum_mismatch": (
-            f"Map the observed value at {issue.path} to an accepted enum member."
-        ),
-        "tool_removed": (
-            "Keep a compatibility alias or migrate traces to a replacement tool."
-        ),
+        "type_mismatch": (f"Coerce {issue.path} to {issue.expected!r} before invoking the tool."),
+        "enum_mismatch": (f"Map the observed value at {issue.path} to an accepted enum member."),
+        "tool_removed": ("Keep a compatibility alias or migrate traces to a replacement tool."),
     }
     return hints.get(
         issue.code,

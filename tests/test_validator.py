@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agentcompat.validator import validate_instance
+from agentcompat.validator import audit_schema, validate_instance
 
 
 class ValidateInstanceTests(unittest.TestCase):
@@ -61,16 +61,133 @@ class ValidateInstanceTests(unittest.TestCase):
             [issue.code for issue in issues],
         )
 
-    def test_returns_unsupported_keywords_without_failing_the_instance(self) -> None:
+    def test_audits_unsupported_keywords_and_ignores_annotations(self) -> None:
         schema = {
-            "type": "string",
-            "pattern": "^[A-Z]+$",
+            "$id": "https://example.com/schema",
+            "type": "array",
+            "contains": {"type": "string"},
+            "description": "A documented value.",
             "x-provider-note": "metadata",
         }
 
-        issues = validate_instance("lowercase", schema)
+        issues = audit_schema(schema)
 
-        self.assertEqual([], issues)
+        self.assertEqual(
+            [("$id", '$["$id"]'), ("contains", "$.contains")],
+            [(issue.keyword, issue.schema_path) for issue in issues],
+        )
+
+    def test_audits_unsupported_type_and_unresolved_reference_semantics(self) -> None:
+        schema = {
+            "allOf": [
+                {"type": "decimal"},
+                {"$ref": "#/$defs/value"},
+            ],
+            "$defs": {"value": {"type": "number"}},
+        }
+
+        issues = audit_schema(schema)
+
+        self.assertEqual(
+            [
+                ("type:decimal", "$.allOf[0].type"),
+                ("$ref:unresolved", '$.allOf[1]["$ref"]'),
+            ],
+            [(issue.keyword, issue.schema_path) for issue in issues],
+        )
+
+    def test_validates_pattern_and_common_formats(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "pattern": "^[A-Z]{3}$"},
+                "created_at": {"type": "string", "format": "date-time"},
+                "address": {"type": "string", "format": "ipv4"},
+            },
+        }
+
+        issues = validate_instance(
+            {
+                "code": "lower",
+                "created_at": "2026-13-40",
+                "address": "999.1.1.1",
+            },
+            schema,
+        )
+
+        self.assertEqual(
+            [
+                ("pattern_mismatch", "$.code"),
+                ("format_mismatch", "$.created_at"),
+                ("format_mismatch", "$.address"),
+            ],
+            [(issue.code, issue.path) for issue in issues],
+        )
+
+    def test_applies_conditional_schema_branch(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "kind": {"enum": ["email", "sms"]},
+                "address": {"type": "string"},
+                "phone": {"type": "string"},
+            },
+            "if": {
+                "properties": {"kind": {"const": "email"}},
+                "required": ["kind"],
+            },
+            "then": {"required": ["address"]},
+            "else": {"required": ["phone"]},
+        }
+
+        email_issues = validate_instance({"kind": "email"}, schema)
+        sms_issues = validate_instance({"kind": "sms"}, schema)
+
+        self.assertEqual("$.address", email_issues[0].path)
+        self.assertEqual("$.phone", sms_issues[0].path)
+
+    def test_validates_prefix_and_legacy_tuple_items(self) -> None:
+        prefix_schema = {
+            "type": "array",
+            "prefixItems": [{"type": "string"}, {"type": "integer"}],
+            "items": False,
+        }
+        legacy_schema = {
+            "type": "array",
+            "items": [{"type": "string"}, {"type": "integer"}],
+            "additionalItems": False,
+        }
+
+        prefix_issues = validate_instance(["ok", "wrong", "extra"], prefix_schema)
+        legacy_issues = validate_instance(["ok", "wrong", "extra"], legacy_schema)
+
+        self.assertEqual(
+            [("type_mismatch", "$[1]"), ("false_schema", "$[2]")],
+            [(issue.code, issue.path) for issue in prefix_issues],
+        )
+        self.assertEqual(
+            [("type_mismatch", "$[1]"), ("false_schema", "$[2]")],
+            [(issue.code, issue.path) for issue in legacy_issues],
+        )
+
+    def test_validates_multiple_of_and_unique_items(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "ratio": {"type": "number", "multipleOf": 0.25},
+                "labels": {"type": "array", "uniqueItems": True},
+            },
+        }
+
+        issues = validate_instance(
+            {"ratio": 0.3, "labels": ["a", {"x": 1}, {"x": 1}]},
+            schema,
+        )
+
+        self.assertEqual(
+            [("multiple_of", "$.ratio"), ("unique_items", "$.labels")],
+            [(issue.code, issue.path) for issue in issues],
+        )
 
 
 if __name__ == "__main__":

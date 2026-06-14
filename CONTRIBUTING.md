@@ -32,7 +32,7 @@ make quality
 - Add or update tests for behavior changes.
 - Keep public types and JSON output backward compatible unless the change is documented.
 - Use synthetic or anonymized traces only.
-- Do not commit credentials, private prompts, production payloads, or customer identifiers.
+- Do not commit credentials, private instructions, production payloads, or customer identifiers.
 - State measurable results as fixture or benchmark results, not universal performance claims.
 
 ## Pull requests

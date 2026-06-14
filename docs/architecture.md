@@ -13,8 +13,10 @@ tool, mutate a payload, or upload traces.
 ### Input normalization
 
 `agentcompat.io` loads bounded local files and converts MCP-style `inputSchema` and OpenAI-style
-`function.parameters` definitions into a map from tool name to JSON Schema. Trace records use a
-small canonical contract: `trace_id`, `tool`, object-valued `arguments`, and a positive `weight`.
+`function.parameters` definitions into a map from tool name to JSON Schema. It resolves local
+JSON Pointer references while enforcing a bundle-directory sandbox and rejecting reference
+cycles. Trace records use a small canonical contract: `trace_id`, `tool`, object-valued
+`arguments`, and a positive `weight`.
 
 ### Schema validation
 
@@ -28,12 +30,17 @@ The current subset covers:
 - `properties`, `required`, and `additionalProperties`
 - `enum` and `const`
 - `minimum`, `maximum`, `exclusiveMinimum`, and `exclusiveMaximum`
+- `multipleOf`
 - `minLength`, `maxLength`, `minItems`, `maxItems`, `minProperties`, and `maxProperties`
-- homogeneous `items`
+- `pattern` and common standard-library-backed `format` checks
+- homogeneous `items`, `prefixItems`, legacy tuple arrays, and `uniqueItems`
 - `allOf`, `anyOf`, and `oneOf`
+- `if`, `then`, and `else`
+- sandboxed local `$ref` values and boolean schemas
 
-Full Draft 2020-12 coverage is not implied. Explicit unsupported-keyword auditing and local
-reference resolution are day-two work.
+Full Draft 2020-12 coverage is not implied. The validator audits the complete schema before
+replay and rejects unsupported keywords instead of silently skipping their semantics. The
+executable inventory is documented in [JSON Schema support](schema-support.md).
 
 ### Replay analysis
 
@@ -63,14 +70,17 @@ text output prioritizes the score, evidence denominator, breakage path, and repa
 ## Failure model
 
 Malformed JSON, duplicate tools, invalid trace shapes, non-positive weights, oversized files,
-and trace-count overflow are input errors. They return CLI exit code `2`. A compatibility score
-below policy returns `1`. A completed check at or above policy returns `0`.
+trace-count overflow, unsafe references, reference cycles, and unsupported schema semantics are
+input errors. They return CLI exit code `2`. A compatibility score below policy returns `1`. A
+completed check at or above policy returns `0`. The standalone `audit` command returns `1` when
+unsupported semantics are present.
 
 ## Security posture
 
 - Offline by default; no network client is present.
 - No dynamic imports, expression evaluation, shell execution, or tool invocation.
 - Input files are size-bounded and traces are count-bounded.
+- Reference files are restricted to the tool bundle directory and are size-bounded.
 - Trace arguments are never written to a cache or log by the library.
 - CI permissions are read-only.
 
