@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import contextlib
+import io
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
+
+from agentcompat.cli import main
+
+
+class CheckCommandTests(unittest.TestCase):
+    def test_check_outputs_json_and_enforces_threshold(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline = root / "baseline.json"
+            candidate = root / "candidate.json"
+            traces = root / "traces.jsonl"
+            baseline.write_text(
+                json.dumps(
+                    {
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {"query": {"type": "string"}},
+                                    "required": ["query"],
+                                },
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            candidate.write_text(
+                json.dumps(
+                    {
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "query": {"type": "string"},
+                                        "tenant_id": {"type": "string"},
+                                    },
+                                    "required": ["query", "tenant_id"],
+                                },
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            traces.write_text(
+                '{"trace_id":"trace-1","tool":"search","arguments":{"query":"x"}}\n',
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "check",
+                        "--baseline",
+                        str(baseline),
+                        "--candidate",
+                        str(candidate),
+                        "--traces",
+                        str(traces),
+                        "--format",
+                        "json",
+                        "--fail-under",
+                        "50",
+                    ]
+                )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(1, exit_code)
+        self.assertEqual(0.0, payload["summary"]["score"])
+        self.assertEqual("missing_required", payload["results"][0]["issues"][0]["code"])
+
+
+if __name__ == "__main__":
+    unittest.main()

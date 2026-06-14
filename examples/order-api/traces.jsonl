@@ -1,0 +1,7 @@
+{"trace_id":"pass-search","tool":"search_orders","arguments":{"status":"open","customer_id":"cust-1","limit":10},"weight":5}
+{"trace_id":"break-enum","tool":"search_orders","arguments":{"status":"closed","customer_id":"cust-2"},"weight":2}
+{"trace_id":"break-required","tool":"search_orders","arguments":{"status":"open"},"weight":2}
+{"trace_id":"break-property","tool":"search_orders","arguments":{"status":"open","customer_id":"cust-3","include_archived":true},"weight":1}
+{"trace_id":"break-limit","tool":"search_orders","arguments":{"status":"open","customer_id":"cust-4","limit":75},"weight":1}
+{"trace_id":"pass-customer","tool":"get_customer","arguments":{"customer_id":"cust-5"},"weight":2}
+{"trace_id":"excluded-baseline-invalid","tool":"search_orders","arguments":{"status":"open","legacy":true},"weight":100}

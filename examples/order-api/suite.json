@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "name": "order-api-v1-to-v2",
+      "baseline": "baseline.json",
+      "candidate": "candidate.json",
+      "traces": "traces.jsonl",
+      "expected_breakages": {
+        "break-enum": ["enum_mismatch"],
+        "break-required": ["missing_required"],
+        "break-property": ["unexpected_property"],
+        "break-limit": ["maximum"]
+      }
+    }
+  ]
+}
