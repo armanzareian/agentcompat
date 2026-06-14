@@ -12,3 +12,10 @@ htmlcov/
 *.py[cod]
 roadmap.md
 ROADMAP.md
+active_project.json
+project_registry.json
+.project-control/
+INTERNAL*.md
+NOTES*.md
+PLAN*.md
+TODO.private.md
