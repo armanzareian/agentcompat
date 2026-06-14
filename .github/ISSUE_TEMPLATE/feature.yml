@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a focused capability or schema keyword.
+title: "feature: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the concrete compatibility-testing gap.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Acceptance test
+      description: Explain how the behavior can be measured or tested.
+    validations:
+      required: true
