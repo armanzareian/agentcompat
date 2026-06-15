@@ -3,6 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from agentcompat.changes import (
+    attribute_issues,
+    build_migration_plan,
+    compare_tool_bundles,
+)
 from agentcompat.models import (
     CompatibilityReport,
     ToolCall,
@@ -25,6 +30,7 @@ def analyze_compatibility(
     if unsupported:
         raise UnsupportedSchemaError(unsupported)
 
+    changes = compare_tool_bundles(baseline, candidate)
     results: list[TraceResult] = []
     eligible_weight = 0.0
     passing_weight = 0.0
@@ -70,6 +76,7 @@ def analyze_compatibility(
             )
         else:
             issues = tuple(validate_instance(trace.arguments, candidate_schema))
+        issues = attribute_issues(trace.tool, issues, changes)
 
         if issues:
             broken += 1
@@ -90,6 +97,7 @@ def analyze_compatibility(
     if eligible_weight:
         score = round((passing_weight / eligible_weight) * 100, 2)
 
+    result_tuple = tuple(results)
     return CompatibilityReport(
         score,
         passed,
@@ -97,7 +105,9 @@ def analyze_compatibility(
         excluded,
         eligible_weight,
         passing_weight,
-        tuple(results),
+        result_tuple,
+        changes,
+        build_migration_plan(changes, result_tuple),
     )
 
 

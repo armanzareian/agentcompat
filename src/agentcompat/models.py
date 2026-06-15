@@ -11,6 +11,7 @@ class ValidationIssue:
     message: str
     expected: Any = None
     actual: Any = None
+    change_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +31,31 @@ class TraceResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SchemaChange:
+    change_id: str
+    kind: str
+    tool: str
+    path: str
+    keyword: str
+    before: Any
+    after: Any
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
+class MigrationPlanItem:
+    change_id: str
+    kind: str
+    tool: str
+    path: str
+    keyword: str
+    affected_weight: float
+    trace_ids: tuple[str, ...]
+    issue_count: int
+    guidance: str
+
+
+@dataclass(frozen=True, slots=True)
 class CompatibilityReport:
     score: float
     passed: int
@@ -38,6 +64,8 @@ class CompatibilityReport:
     eligible_weight: float
     passing_weight: float
     results: tuple[TraceResult, ...]
+    changes: tuple[SchemaChange, ...] = ()
+    migration_plan: tuple[MigrationPlanItem, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

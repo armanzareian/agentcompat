@@ -28,12 +28,42 @@ def report_to_dict(report: CompatibilityReport) -> dict[str, Any]:
                         "message": issue.message,
                         "expected": issue.expected,
                         "actual": issue.actual,
+                        "change_ids": list(issue.change_ids),
                     }
                     for issue in result.issues
                 ],
                 "hints": list(result.hints),
             }
             for result in report.results
+        ],
+        "changes": [
+            {
+                "change_id": change.change_id,
+                "kind": change.kind,
+                "tool": change.tool,
+                "path": change.path,
+                "keyword": change.keyword,
+                "before": change.before,
+                "after": change.after,
+                "description": change.description,
+            }
+            for change in report.changes
+        ],
+        "migration_plan": [
+            {
+                "rank": rank,
+                "change_id": item.change_id,
+                "kind": item.kind,
+                "tool": item.tool,
+                "path": item.path,
+                "keyword": item.keyword,
+                "affected_weight": item.affected_weight,
+                "affected_traces": len(item.trace_ids),
+                "trace_ids": list(item.trace_ids),
+                "issue_count": item.issue_count,
+                "guidance": item.guidance,
+            }
+            for rank, item in enumerate(report.migration_plan, start=1)
         ],
     }
 
@@ -52,8 +82,21 @@ def render_text(report: CompatibilityReport) -> str:
         lines.append(f"{result.status.upper()} {result.trace.trace_id} -> {result.trace.tool}")
         for issue in result.issues:
             lines.append(f"  [{issue.code}] {issue.path}: {issue.message}")
+            for change_id in issue.change_ids:
+                lines.append(f"  Change: {change_id}")
         for hint in result.hints:
             lines.append(f"  Hint: {hint}")
+    if report.migration_plan:
+        lines.append("")
+        lines.append("Migration plan")
+        for rank, item in enumerate(report.migration_plan, start=1):
+            trace_label = "trace" if len(item.trace_ids) == 1 else "traces"
+            lines.append(
+                f"{rank}. [{item.kind}] {item.tool} {item.path} "
+                f"(weight {item.affected_weight:g}; {len(item.trace_ids)} {trace_label})"
+            )
+            lines.append(f"   Change: {item.change_id}")
+            lines.append(f"   {item.guidance}")
     return "\n".join(lines)
 
 

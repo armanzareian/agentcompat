@@ -84,6 +84,12 @@ class CheckCommandTests(unittest.TestCase):
         self.assertEqual(1, exit_code)
         self.assertEqual(0.0, payload["summary"]["score"])
         self.assertEqual("missing_required", payload["results"][0]["issues"][0]["code"])
+        self.assertEqual(
+            payload["changes"][0]["change_id"],
+            payload["results"][0]["issues"][0]["change_ids"][0],
+        )
+        self.assertEqual("required_added", payload["migration_plan"][0]["kind"])
+        self.assertEqual(["trace-1"], payload["migration_plan"][0]["trace_ids"])
 
     def test_audit_reports_unsupported_schema_keywords(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

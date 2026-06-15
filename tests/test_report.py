@@ -6,12 +6,40 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agentcompat.models import CompatibilityReport, ToolCall, TraceResult, ValidationIssue
+from agentcompat.models import (
+    CompatibilityReport,
+    MigrationPlanItem,
+    SchemaChange,
+    ToolCall,
+    TraceResult,
+    ValidationIssue,
+)
 from agentcompat.report import render_text, report_to_dict
 
 
 class ReportTests(unittest.TestCase):
     def test_renders_failures_and_skips_passed_trace_details(self) -> None:
+        change = SchemaChange(
+            change_id="chg_required",
+            kind="required_added",
+            tool="search",
+            path="$.query",
+            keyword="required",
+            before=False,
+            after=True,
+            description="$.query became required for tool 'search'.",
+        )
+        migration = MigrationPlanItem(
+            change_id="chg_required",
+            kind="required_added",
+            tool="search",
+            path="$.query",
+            keyword="required",
+            affected_weight=1.0,
+            trace_ids=("broken",),
+            issue_count=1,
+            guidance="Populate $.query for search calls.",
+        )
         report = CompatibilityReport(
             score=50.0,
             passed=1,
@@ -29,11 +57,14 @@ class ReportTests(unittest.TestCase):
                             "missing_required",
                             "$.query",
                             "Required property is missing.",
+                            change_ids=("chg_required",),
                         ),
                     ),
                     ("Provide query.",),
                 ),
             ),
+            changes=(change,),
+            migration_plan=(migration,),
         )
 
         rendered = render_text(report)
@@ -43,7 +74,31 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn("PASSED passed", rendered)
         self.assertIn("BROKEN broken", rendered)
         self.assertIn("Hint: Provide query.", rendered)
+        self.assertIn("Change: chg_required", rendered)
+        self.assertIn("Migration plan", rendered)
+        self.assertIn("1. [required_added] search $.query", rendered)
         self.assertEqual("missing_required", payload["results"][1]["issues"][0]["code"])
+        self.assertEqual(
+            ["chg_required"],
+            payload["results"][1]["issues"][0]["change_ids"],
+        )
+        self.assertEqual("chg_required", payload["changes"][0]["change_id"])
+        self.assertEqual(
+            {
+                "rank": 1,
+                "change_id": "chg_required",
+                "kind": "required_added",
+                "tool": "search",
+                "path": "$.query",
+                "keyword": "required",
+                "affected_weight": 1.0,
+                "affected_traces": 1,
+                "trace_ids": ["broken"],
+                "issue_count": 1,
+                "guidance": "Populate $.query for search calls.",
+            },
+            payload["migration_plan"][0],
+        )
 
 
 if __name__ == "__main__":

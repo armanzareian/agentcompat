@@ -21,6 +21,8 @@ for local development and CI.
 - **Honest denominator:** baseline-invalid traces are reported and excluded from compatibility.
 - **Usage weighting:** frequent or business-critical traces can carry more weight.
 - **Actionable failures:** each breakage includes a JSON path, reason code, and migration hint.
+- **Causal migration plan:** failures link to stable structural change IDs and roll up into
+  weighted, deduplicated migration work.
 - **Measurable evaluation:** labeled suites report precision, recall, F1, and root-cause accuracy.
 - **Provider-neutral input:** normalize MCP-style and OpenAI-style tool bundles.
 
@@ -107,10 +109,20 @@ AgentCompat compatibility report
 Score: 53.85/100
 Calls: 2 passed, 4 broken, 1 excluded
 Observed weight: 7/13 compatible
+
+Migration plan
+1. [required_added] search_orders $.customer_id (weight 2; 1 trace)
+2. [enum_narrowed] search_orders $.status (weight 2; 1 trace)
 ```
 
-Use `--format json` for CI systems and downstream analysis. Exit code `1` means the score is
-below `--fail-under`; malformed or unsafe input limits return `2`.
+Each broken issue includes the `change_id` that caused it. The plan groups repeated failures by
+change, counts each affected trace weight once, and sorts by affected weight, trace count, then
+stable structural keys. Use `--format json` for the complete `changes`, per-issue `change_ids`,
+and `migration_plan` arrays. See [Change attribution](docs/change-attribution.md) for the
+machine-readable contract.
+
+Exit code `1` means the score is below `--fail-under`; malformed or unsafe input limits return
+`2`.
 
 ## Architecture
 
@@ -123,9 +135,13 @@ flowchart LR
     R -->|valid evidence| V["Candidate validation"]
     R -->|already invalid| X["Excluded evidence"]
     V --> S["Weighted compatibility score"]
-    V --> D["Path-level diagnostics and hints"]
+    V --> D["Path-level diagnostics"]
+    N --> G["Structural change graph"]
+    G --> D
+    D --> M["Ranked migration plan"]
     S --> O["Text or JSON report"]
     D --> O
+    M --> O
     O --> E["Labeled evaluation metrics"]
 ```
 

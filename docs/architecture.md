@@ -56,6 +56,18 @@ The compatibility score is:
 
 Results retain trace order and distinguish `passed`, `broken`, and `excluded` states.
 
+### Change attribution
+
+`agentcompat.changes` compares normalized baseline and candidate bundles before replay. It emits
+content-derived change IDs for removed tools and properties, added requirements, narrowed types
+and enums, and tightened constraints. Object properties and array item schemas retain instance
+paths, including wildcard paths such as `$.rows[*].code`.
+
+Candidate validation issues are matched to changes by tool, normalized instance path, issue
+class, and schema keyword. Baseline-invalid issues are never attributed because they are not
+candidate regressions. Attributed changes are aggregated once per affected trace weight and
+ranked deterministically for migration planning.
+
 ### Evaluation
 
 `agentcompat.evaluation` compares predicted broken trace IDs and issue codes with labeled
@@ -65,7 +77,9 @@ Evaluation manifests resolve fixture paths relative to the manifest file for por
 ### Presentation
 
 `agentcompat.report` is a pure rendering layer. JSON output uses stable field names for CI, while
-text output prioritizes the score, evidence denominator, breakage path, and repair hint.
+text output prioritizes the score, evidence denominator, breakage path, causal change ID, and
+ranked migration guidance. See [Change attribution](change-attribution.md) for the output
+contract.
 
 ## Failure model
 
