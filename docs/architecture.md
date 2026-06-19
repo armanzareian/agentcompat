@@ -15,8 +15,15 @@ tool, mutate a payload, or upload traces.
 `agentcompat.io` loads bounded local files and converts MCP-style `inputSchema` and OpenAI-style
 `function.parameters` definitions into a map from tool name to JSON Schema. It resolves local
 JSON Pointer references while enforcing a bundle-directory sandbox and rejecting reference
-cycles. Trace records use a small canonical contract: `trace_id`, `tool`, object-valued
-`arguments`, and a positive `weight`.
+cycles.
+
+Trace records use a small canonical contract: `trace_id`, `tool`, object-valued `arguments`,
+and a positive `weight`. Provider adapters convert common OpenAI Responses and Chat Completions
+tool calls, Anthropic `tool_use` blocks, MCP `tools/call` requests, and LangChain
+`on_tool_start` events into that same model. Exact JSON paths and key-name regular expressions
+can be redacted before the canonical `ToolCall` reaches replay. Adapter parse errors report the
+line and source field that failed without echoing the malformed argument payload. Non-tool
+provider stream events are ignored, and files containing no tool calls are rejected.
 
 ### Schema validation
 
@@ -96,7 +103,6 @@ unsupported semantics are present.
 - Input files are size-bounded and traces are count-bounded.
 - Reference files are restricted to the tool bundle directory and are size-bounded.
 - Trace arguments are never written to a cache or log by the library.
+- Trace adapters support field-level redaction before replay and avoid printing malformed
+  provider argument payloads in parse errors.
 - CI permissions are read-only.
-
-The repository does not yet provide automated secret detection or field-level redaction. Those
-controls are part of the trace-adapter milestone before production telemetry ingestion.

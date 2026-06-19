@@ -1,0 +1,7 @@
+{"choices":[{"message":{"tool_calls":[{"id":"pass-search","type":"function","function":{"name":"search_orders","arguments":"{\"status\":\"open\",\"customer_id\":\"cust-1\",\"limit\":10}"}}]}}],"weight":5}
+{"choices":[{"message":{"tool_calls":[{"id":"break-enum","type":"function","function":{"name":"search_orders","arguments":"{\"status\":\"closed\",\"customer_id\":\"cust-2\"}"}}]}}],"weight":2}
+{"choices":[{"message":{"tool_calls":[{"id":"break-required","type":"function","function":{"name":"search_orders","arguments":"{\"status\":\"open\"}"}}]}}],"weight":2}
+{"choices":[{"message":{"tool_calls":[{"id":"break-property","type":"function","function":{"name":"search_orders","arguments":"{\"status\":\"open\",\"customer_id\":\"cust-3\",\"include_archived\":true}"}}]}}],"weight":1}
+{"choices":[{"message":{"tool_calls":[{"id":"break-limit","type":"function","function":{"name":"search_orders","arguments":"{\"status\":\"open\",\"customer_id\":\"cust-4\",\"limit\":75}"}}]}}],"weight":1}
+{"choices":[{"message":{"tool_calls":[{"id":"pass-customer","type":"function","function":{"name":"get_customer","arguments":"{\"customer_id\":\"cust-5\"}"}}]}}],"weight":2}
+{"choices":[{"message":{"tool_calls":[{"id":"excluded-baseline-invalid","type":"function","function":{"name":"search_orders","arguments":"{\"status\":\"open\",\"legacy\":true}"}}]}}],"weight":100}

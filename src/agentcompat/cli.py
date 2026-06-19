@@ -8,7 +8,14 @@ from pathlib import Path
 
 from agentcompat.analyzer import analyze_compatibility
 from agentcompat.evaluation import evaluate_report
-from agentcompat.io import InputError, load_json, load_tool_bundle, read_traces
+from agentcompat.io import (
+    TRACE_FORMATS,
+    InputError,
+    RedactionConfig,
+    load_json,
+    load_tool_bundle,
+    read_traces,
+)
 from agentcompat.models import EvaluationMetrics
 from agentcompat.report import (
     evaluation_to_dict,
@@ -50,6 +57,9 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--baseline", type=Path, required=True)
     check.add_argument("--candidate", type=Path, required=True)
     check.add_argument("--traces", type=Path, required=True)
+    check.add_argument("--trace-format", choices=sorted(TRACE_FORMATS), default="canonical")
+    check.add_argument("--redact-path", action="append", default=[])
+    check.add_argument("--redact-key-pattern", action="append", default=[])
     check.add_argument("--format", choices=("text", "json"), default="text")
     check.add_argument("--fail-under", type=_score, default=100.0)
     check.add_argument("--max-traces", type=int, default=10_000)
@@ -71,7 +81,15 @@ def _run_check(args: argparse.Namespace) -> int:
     report = analyze_compatibility(
         load_tool_bundle(args.baseline),
         load_tool_bundle(args.candidate),
-        read_traces(args.traces, max_traces=args.max_traces),
+        read_traces(
+            args.traces,
+            max_traces=args.max_traces,
+            trace_format=args.trace_format,
+            redaction=RedactionConfig(
+                paths=tuple(args.redact_path),
+                key_patterns=tuple(args.redact_key_pattern),
+            ),
+        ),
     )
     if args.format == "json":
         print(json.dumps(report_to_dict(report), indent=2, sort_keys=True))

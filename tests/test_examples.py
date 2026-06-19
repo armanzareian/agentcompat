@@ -41,6 +41,35 @@ class ExampleWorkflowTests(unittest.TestCase):
         self.assertEqual(4, payload["summary"]["broken"])
         self.assertEqual(1, payload["summary"]["excluded"])
 
+    def test_order_api_openai_example_matches_canonical_score(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exit_code = main(
+                [
+                    "check",
+                    "--baseline",
+                    str(self.root / "examples/order-api/baseline.json"),
+                    "--candidate",
+                    str(self.root / "examples/order-api/candidate.json"),
+                    "--traces",
+                    str(self.root / "examples/order-api/openai-traces.jsonl"),
+                    "--trace-format",
+                    "openai",
+                    "--redact-path",
+                    "$.customer_id",
+                    "--format",
+                    "json",
+                    "--fail-under",
+                    "50",
+                ]
+            )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(0, exit_code)
+        self.assertEqual(53.85, payload["summary"]["score"])
+        self.assertEqual(4, payload["summary"]["broken"])
+        self.assertEqual(1, payload["summary"]["excluded"])
+
     def test_labeled_example_suite_reaches_perfect_detection(self) -> None:
         output = io.StringIO()
         with contextlib.redirect_stdout(output):

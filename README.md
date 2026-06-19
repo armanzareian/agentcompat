@@ -23,6 +23,8 @@ for local development and CI.
 - **Actionable failures:** each breakage includes a JSON path, reason code, and migration hint.
 - **Causal migration plan:** failures link to stable structural change IDs and roll up into
   weighted, deduplicated migration work.
+- **Trace adapters with redaction:** read common OpenAI, Anthropic, MCP, and LangChain tool-call
+  records while scrubbing configured fields before replay.
 - **Measurable evaluation:** labeled suites report precision, recall, F1, and root-cause accuracy.
 - **Provider-neutral input:** normalize MCP-style and OpenAI-style tool bundles.
 
@@ -102,6 +104,34 @@ OpenAI-style `function.parameters` is also accepted. Traces are JSON Lines:
 traversal, remote references, missing pointers, and cycles are rejected. AgentCompat performs
 no network requests and never executes trace content.
 
+Trace files can also use provider-shaped records:
+
+```bash
+agentcompat check \
+  --baseline examples/order-api/baseline.json \
+  --candidate examples/order-api/candidate.json \
+  --traces examples/order-api/openai-traces.jsonl \
+  --trace-format openai \
+  --redact-path '$.customer_id' \
+  --redact-key-pattern 'token|api[_-]?key' \
+  --fail-under 50
+```
+
+Supported trace formats are:
+
+- `canonical`: AgentCompat JSONL with `trace_id`, `tool`, `arguments`, and optional `weight`.
+- `openai`: Responses API `function_call` items and Chat Completions `message.tool_calls`.
+- `anthropic`: `tool_use` content blocks and matching content-block stream records.
+- `mcp`: JSON-RPC `tools/call` requests, including request-wrapped transcript rows.
+- `langchain`: `on_tool_start` events with object-valued `data.input`.
+
+`--redact-path` matches exact argument JSON paths such as `$.customer.email` or
+`$.rows[*].secret`. `--redact-key-pattern` applies a regular expression to argument object keys
+at any depth. Redaction happens before canonical `ToolCall` objects are returned to replay, so
+validation reports can only include the replacement value. Adapter errors identify the source
+line and field without echoing malformed argument payloads. Non-tool rows in provider stream
+logs are skipped; a file with no tool calls is rejected.
+
 ## Output
 
 ```text
@@ -130,7 +160,8 @@ Exit code `1` means the score is below `--fail-under`; malformed or unsafe input
 flowchart LR
     A["Baseline tool bundle"] --> N["Input normalization"]
     B["Candidate tool bundle"] --> N
-    C["Observed JSONL calls"] --> R["Baseline replay"]
+    C["Observed traces"] --> T["Trace adapters and redaction"]
+    T --> R["Baseline replay"]
     N --> R
     R -->|valid evidence| V["Candidate validation"]
     R -->|already invalid| X["Excluded evidence"]
