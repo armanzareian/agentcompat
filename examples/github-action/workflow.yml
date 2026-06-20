@@ -1,0 +1,27 @@
+name: AgentCompat
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: armanzareian/agentcompat@main
+        with:
+          config: .agentcompat.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agentcompat-reports
+          path: |
+            agentcompat-report.json
+            agentcompat.sarif

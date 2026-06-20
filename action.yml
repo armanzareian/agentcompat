@@ -1,0 +1,133 @@
+name: AgentCompat
+description: Replay LLM tool-call traces against candidate schemas in GitHub Actions.
+
+inputs:
+  config:
+    description: Optional JSON policy file, usually .agentcompat.json.
+    required: false
+    default: ""
+  baseline:
+    description: Baseline tool bundle path.
+    required: false
+    default: ""
+  candidate:
+    description: Candidate tool bundle path. May be discovered from policy globs.
+    required: false
+    default: ""
+  traces:
+    description: Trace JSONL path.
+    required: false
+    default: ""
+  trace-format:
+    description: "Trace format: canonical, openai, anthropic, mcp, or langchain."
+    required: false
+    default: ""
+  fail-under:
+    description: Minimum compatibility score required for success.
+    required: false
+    default: ""
+  max-traces:
+    description: Maximum trace records to replay.
+    required: false
+    default: ""
+  redact-paths:
+    description: Newline-separated exact argument JSON paths to redact before replay.
+    required: false
+    default: ""
+  redact-key-patterns:
+    description: Newline-separated regular expressions matching argument keys to redact.
+    required: false
+    default: ""
+  report-json:
+    description: Path for the machine-readable AgentCompat JSON report.
+    required: false
+    default: agentcompat-report.json
+  sarif:
+    description: Path for the SARIF report.
+    required: false
+    default: agentcompat.sarif
+
+outputs:
+  score:
+    description: Compatibility score formatted with two decimal places.
+    value: ${{ steps.agentcompat.outputs.score }}
+  passed:
+    description: Number of eligible calls that remain candidate-compatible.
+    value: ${{ steps.agentcompat.outputs.passed }}
+  broken:
+    description: Number of eligible calls that break under the candidate schema.
+    value: ${{ steps.agentcompat.outputs.broken }}
+  excluded:
+    description: Number of baseline-invalid or unknown-tool calls excluded from the score.
+    value: ${{ steps.agentcompat.outputs.excluded }}
+  report-json:
+    description: Path to the JSON report.
+    value: ${{ steps.agentcompat.outputs.report-json }}
+  sarif:
+    description: Path to the SARIF report.
+    value: ${{ steps.agentcompat.outputs.sarif }}
+
+runs:
+  using: composite
+  steps:
+    - id: agentcompat
+      name: Run AgentCompat
+      shell: bash
+      env:
+        AGENTCOMPAT_CONFIG: ${{ inputs.config }}
+        AGENTCOMPAT_BASELINE: ${{ inputs.baseline }}
+        AGENTCOMPAT_CANDIDATE: ${{ inputs.candidate }}
+        AGENTCOMPAT_TRACES: ${{ inputs.traces }}
+        AGENTCOMPAT_TRACE_FORMAT: ${{ inputs.trace-format }}
+        AGENTCOMPAT_FAIL_UNDER: ${{ inputs.fail-under }}
+        AGENTCOMPAT_MAX_TRACES: ${{ inputs.max-traces }}
+        AGENTCOMPAT_REDACT_PATHS: ${{ inputs.redact-paths }}
+        AGENTCOMPAT_REDACT_KEY_PATTERNS: ${{ inputs.redact-key-patterns }}
+        AGENTCOMPAT_REPORT_JSON: ${{ inputs.report-json }}
+        AGENTCOMPAT_SARIF: ${{ inputs.sarif }}
+      run: |
+        set -euo pipefail
+
+        args=()
+        if [ -n "$AGENTCOMPAT_CONFIG" ]; then
+          args+=(--config "$AGENTCOMPAT_CONFIG")
+        fi
+        if [ -n "$AGENTCOMPAT_BASELINE" ]; then
+          args+=(--baseline "$AGENTCOMPAT_BASELINE")
+        fi
+        if [ -n "$AGENTCOMPAT_CANDIDATE" ]; then
+          args+=(--candidate "$AGENTCOMPAT_CANDIDATE")
+        fi
+        if [ -n "$AGENTCOMPAT_TRACES" ]; then
+          args+=(--traces "$AGENTCOMPAT_TRACES")
+        fi
+        if [ -n "$AGENTCOMPAT_TRACE_FORMAT" ]; then
+          args+=(--trace-format "$AGENTCOMPAT_TRACE_FORMAT")
+        fi
+        if [ -n "$AGENTCOMPAT_FAIL_UNDER" ]; then
+          args+=(--fail-under "$AGENTCOMPAT_FAIL_UNDER")
+        fi
+        if [ -n "$AGENTCOMPAT_MAX_TRACES" ]; then
+          args+=(--max-traces "$AGENTCOMPAT_MAX_TRACES")
+        fi
+        if [ -n "$AGENTCOMPAT_REPORT_JSON" ]; then
+          args+=(--report-json "$AGENTCOMPAT_REPORT_JSON")
+        fi
+        if [ -n "$AGENTCOMPAT_SARIF" ]; then
+          args+=(--sarif "$AGENTCOMPAT_SARIF")
+        fi
+
+        while IFS= read -r value; do
+          if [ -n "$value" ]; then
+            args+=(--redact-path "$value")
+          fi
+        done <<< "$AGENTCOMPAT_REDACT_PATHS"
+
+        while IFS= read -r value; do
+          if [ -n "$value" ]; then
+            args+=(--redact-key-pattern "$value")
+          fi
+        done <<< "$AGENTCOMPAT_REDACT_KEY_PATTERNS"
+
+        PYTHONPATH="$GITHUB_ACTION_PATH/src${PYTHONPATH:+:$PYTHONPATH}" \
+          python3 -m agentcompat.github_action "${args[@]}"

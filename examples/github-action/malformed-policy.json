@@ -1,0 +1,7 @@
+{
+  "baseline": "examples/order-api/baseline.json",
+  "candidate": "examples/order-api/candidate.json",
+  "traces": "examples/github-action/malformed-traces.jsonl",
+  "trace_format": "canonical",
+  "fail_under": 50
+}

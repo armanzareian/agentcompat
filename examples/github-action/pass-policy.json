@@ -1,0 +1,19 @@
+{
+  "baseline": "examples/order-api/baseline.json",
+  "traces": "examples/order-api/traces.jsonl",
+  "trace_format": "canonical",
+  "fail_under": 50,
+  "max_traces": 10000,
+  "redact_paths": [
+    "$.customer_id"
+  ],
+  "redact_key_patterns": [
+    "token|secret|api[_-]?key"
+  ],
+  "changed_schema_discovery": {
+    "enabled": true,
+    "globs": [
+      "examples/order-api/candidate.json"
+    ]
+  }
+}

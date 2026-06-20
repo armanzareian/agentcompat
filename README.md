@@ -154,6 +154,29 @@ machine-readable contract.
 Exit code `1` means the score is below `--fail-under`; malformed or unsafe input limits return
 `2`.
 
+## GitHub Actions
+
+Use the reusable action to enforce the same compatibility policy in CI:
+
+```yaml
+permissions:
+  contents: read
+
+steps:
+  - uses: actions/checkout@v4
+    with:
+      persist-credentials: false
+
+  - uses: armanzareian/agentcompat@main
+    with:
+      config: .agentcompat.json
+```
+
+The action writes a pull-request job summary with links to affected trace IDs, exposes score and
+call-count outputs, and generates JSON plus SARIF reports. See the
+[GitHub Action guide](docs/github-action.md) for policy configuration, changed-schema discovery,
+read-only workflow permissions, and fixture outcomes.
+
 ## Architecture
 
 ```mermaid

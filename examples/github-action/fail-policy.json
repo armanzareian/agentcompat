@@ -1,0 +1,10 @@
+{
+  "baseline": "examples/order-api/baseline.json",
+  "candidate": "examples/order-api/candidate.json",
+  "traces": "examples/order-api/traces.jsonl",
+  "trace_format": "canonical",
+  "fail_under": 90,
+  "redact_paths": [
+    "$.customer_id"
+  ]
+}

@@ -4,12 +4,14 @@ import contextlib
 import io
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agentcompat.cli import main
+from agentcompat.github_action import main as action_main
 
 
 class ExampleWorkflowTests(unittest.TestCase):
@@ -88,6 +90,32 @@ class ExampleWorkflowTests(unittest.TestCase):
         self.assertEqual(1.0, payload["aggregate"]["precision"])
         self.assertEqual(1.0, payload["aggregate"]["recall"])
         self.assertEqual(1.0, payload["aggregate"]["root_cause_accuracy"])
+
+    def test_github_action_fixture_policies_cover_expected_outcomes(self) -> None:
+        policies = (
+            ("pass-policy.json", 0),
+            ("fail-policy.json", 1),
+            ("malformed-policy.json", 2),
+        )
+        for policy_name, expected_exit in policies:
+            with self.subTest(policy=policy_name), tempfile.TemporaryDirectory() as directory:
+                output_dir = Path(directory)
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    exit_code = action_main(
+                        [
+                            "--config",
+                            str(self.root / "examples/github-action" / policy_name),
+                            "--report-json",
+                            str(output_dir / "report.json"),
+                            "--sarif",
+                            str(output_dir / "report.sarif"),
+                        ],
+                        cwd=self.root,
+                    )
+
+                self.assertEqual(expected_exit, exit_code)
+                self.assertNotIn("Traceback", stderr.getvalue())
 
 
 if __name__ == "__main__":
