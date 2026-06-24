@@ -11,6 +11,7 @@ from agentcompat.models import (
     MigrationPlanItem,
     SchemaChange,
     ToolCall,
+    ToolSummary,
     TraceResult,
     ValidationIssue,
 )
@@ -65,6 +66,19 @@ class ReportTests(unittest.TestCase):
             ),
             changes=(change,),
             migration_plan=(migration,),
+            tool_summaries=(
+                ToolSummary(
+                    tool="search",
+                    score=50.0,
+                    passed=1,
+                    broken=1,
+                    excluded=0,
+                    eligible_weight=2.0,
+                    passing_weight=1.0,
+                    risk_weight=1.0,
+                    excluded_weight=0.0,
+                ),
+            ),
         )
 
         rendered = render_text(report)
@@ -77,7 +91,23 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Change: chg_required", rendered)
         self.assertIn("Migration plan", rendered)
         self.assertIn("1. [required_added] search $.query", rendered)
+        self.assertIn("Tool risk", rendered)
+        self.assertIn("- search: 50.00/100", rendered)
         self.assertEqual("missing_required", payload["results"][1]["issues"][0]["code"])
+        self.assertEqual(
+            {
+                "tool": "search",
+                "score": 50.0,
+                "passed": 1,
+                "broken": 1,
+                "excluded": 0,
+                "eligible_weight": 2.0,
+                "passing_weight": 1.0,
+                "risk_weight": 1.0,
+                "excluded_weight": 0.0,
+            },
+            payload["tools"][0],
+        )
         self.assertEqual(
             ["chg_required"],
             payload["results"][1]["issues"][0]["change_ids"],

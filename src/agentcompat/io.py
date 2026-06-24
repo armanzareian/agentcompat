@@ -75,31 +75,48 @@ def read_traces(
     trace_format: str = "canonical",
     redaction: RedactionConfig | None = None,
 ) -> list[ToolCall]:
+    return list(
+        iter_traces(
+            path,
+            max_traces=max_traces,
+            trace_format=trace_format,
+            redaction=redaction,
+        )
+    )
+
+
+def iter_traces(
+    path: Path,
+    *,
+    max_traces: int = 10_000,
+    trace_format: str = "canonical",
+    redaction: RedactionConfig | None = None,
+) -> Iterator[ToolCall]:
     if trace_format not in TRACE_FORMATS:
         supported = ", ".join(sorted(TRACE_FORMATS))
         raise InputError(f"Unsupported trace format {trace_format!r}; choose one of {supported}.")
 
     _check_file_size(path)
     prepared_redaction = _prepare_redaction(redaction)
-    traces: list[ToolCall] = []
+    trace_count = 0
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
             if not line.strip():
                 continue
-            if len(traces) >= max_traces:
+            if trace_count >= max_traces:
                 raise InputError(f"Trace file exceeds the limit of {max_traces} records.")
             try:
                 payload = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise InputError(f"Invalid JSON on line {line_number}: {exc.msg}.") from exc
             for trace in _iter_trace_records(payload, line_number, trace_format):
-                if len(traces) >= max_traces:
+                if trace_count >= max_traces:
                     raise InputError(f"Trace file exceeds the limit of {max_traces} records.")
-                traces.append(_apply_redaction(trace, prepared_redaction))
+                trace_count += 1
+                yield _apply_redaction(trace, prepared_redaction)
 
-    if not traces:
+    if not trace_count:
         raise InputError("Trace file contains no records.")
-    return traces
 
 
 def load_tool_bundle(path: Path) -> dict[str, dict[str, Any]]:

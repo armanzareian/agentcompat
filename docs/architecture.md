@@ -20,10 +20,12 @@ cycles.
 Trace records use a small canonical contract: `trace_id`, `tool`, object-valued `arguments`,
 and a positive `weight`. Provider adapters convert common OpenAI Responses and Chat Completions
 tool calls, Anthropic `tool_use` blocks, MCP `tools/call` requests, and LangChain
-`on_tool_start` events into that same model. Exact JSON paths and key-name regular expressions
-can be redacted before the canonical `ToolCall` reaches replay. Adapter parse errors report the
-line and source field that failed without echoing the malformed argument payload. Non-tool
-provider stream events are ignored, and files containing no tool calls are rejected.
+`on_tool_start` events into that same model. Trace records are yielded into replay as they are
+parsed instead of first being materialized into a separate list. Exact JSON paths and key-name
+regular expressions can be redacted before the canonical `ToolCall` reaches replay. Adapter
+parse errors report the line and source field that failed without echoing the malformed argument
+payload. Non-tool provider stream events are ignored, and files containing no tool calls are
+rejected.
 
 ### Schema validation
 
@@ -62,6 +64,9 @@ The compatibility score is:
 ```
 
 Results retain trace order and distinguish `passed`, `broken`, and `excluded` states.
+Reports also aggregate per-tool score, broken call count, excluded call count, compatible
+eligible weight, and incompatible eligible weight so high-risk tools can be identified without
+post-processing every trace result.
 
 ### Change attribution
 

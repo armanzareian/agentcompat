@@ -15,9 +15,9 @@ from agentcompat.io import (
     TRACE_FORMATS,
     InputError,
     RedactionConfig,
+    iter_traces,
     load_json,
     load_tool_bundle,
-    read_traces,
 )
 from agentcompat.models import CompatibilityReport, TraceResult, ValidationIssue
 from agentcompat.report import report_to_dict
@@ -40,7 +40,7 @@ def main(
         report = analyze_compatibility(
             load_tool_bundle(settings.baseline),
             load_tool_bundle(settings.candidate),
-            read_traces(
+            iter_traces(
                 settings.traces,
                 max_traces=settings.max_traces,
                 trace_format=settings.trace_format,

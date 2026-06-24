@@ -12,9 +12,9 @@ from agentcompat.io import (
     TRACE_FORMATS,
     InputError,
     RedactionConfig,
+    iter_traces,
     load_json,
     load_tool_bundle,
-    read_traces,
 )
 from agentcompat.models import EvaluationMetrics
 from agentcompat.report import (
@@ -81,7 +81,7 @@ def _run_check(args: argparse.Namespace) -> int:
     report = analyze_compatibility(
         load_tool_bundle(args.baseline),
         load_tool_bundle(args.candidate),
-        read_traces(
+        iter_traces(
             args.traces,
             max_traces=args.max_traces,
             trace_format=args.trace_format,
@@ -183,7 +183,7 @@ def _evaluate_case(root: Path, raw_case: dict[str, object]) -> EvaluationMetrics
     report = analyze_compatibility(
         load_tool_bundle(_case_path(root, raw_case, "baseline")),
         load_tool_bundle(_case_path(root, raw_case, "candidate")),
-        read_traces(_case_path(root, raw_case, "traces")),
+        iter_traces(_case_path(root, raw_case, "traces")),
     )
     return evaluate_report(report, expected)
 

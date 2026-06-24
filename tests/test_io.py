@@ -8,7 +8,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agentcompat.io import InputError, load_tool_bundle, parse_tool_bundle, read_traces
+from agentcompat.io import (
+    InputError,
+    iter_traces,
+    load_tool_bundle,
+    parse_tool_bundle,
+    read_traces,
+)
 
 
 class ToolBundleTests(unittest.TestCase):
@@ -207,6 +213,24 @@ class TraceReaderTests(unittest.TestCase):
 
         self.assertEqual("trace-1", traces[0].trace_id)
         self.assertEqual(2.5, traces[0].weight)
+
+    def test_iter_traces_yields_records_before_later_parse_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "traces.jsonl"
+            path.write_text(
+                (
+                    '{"trace_id":"trace-1","tool":"search","arguments":{"query":"x"}}\n'
+                    "{not json}\n"
+                ),
+                encoding="utf-8",
+            )
+
+            traces = iter_traces(path)
+            first = next(traces)
+
+            self.assertEqual("trace-1", first.trace_id)
+            with self.assertRaisesRegex(InputError, "Invalid JSON on line 2"):
+                next(traces)
 
     def test_rejects_non_positive_trace_weights(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

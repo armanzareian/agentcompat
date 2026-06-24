@@ -60,6 +60,51 @@ class AnalyzeCompatibilityTests(unittest.TestCase):
         self.assertEqual(0.0, report.score)
         self.assertEqual("tool_removed", report.results[0].issues[0].code)
 
+    def test_summarizes_weighted_risk_by_tool(self) -> None:
+        baseline = {
+            "lookup": {"type": "object"},
+            "search": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "tenant_id": {"type": "string"},
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        }
+        candidate = {
+            "lookup": {"type": "object"},
+            "search": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "tenant_id": {"type": "string"},
+                },
+                "required": ["query", "tenant_id"],
+                "additionalProperties": False,
+            },
+        }
+        traces = [
+            ToolCall("search-pass", "search", {"query": "orders", "tenant_id": "a"}, 3),
+            ToolCall("search-break", "search", {"query": "orders"}, 2),
+            ToolCall("search-excluded", "search", {"query": "orders", "extra": True}, 5),
+            ToolCall("lookup-pass", "lookup", {}, 4),
+        ]
+
+        report = analyze_compatibility(baseline, candidate, traces)
+
+        self.assertEqual(["search", "lookup"], [summary.tool for summary in report.tool_summaries])
+        search = report.tool_summaries[0]
+        self.assertEqual(60.0, search.score)
+        self.assertEqual(1, search.passed)
+        self.assertEqual(1, search.broken)
+        self.assertEqual(1, search.excluded)
+        self.assertEqual(5.0, search.eligible_weight)
+        self.assertEqual(3.0, search.passing_weight)
+        self.assertEqual(2.0, search.risk_weight)
+        self.assertEqual(5.0, search.excluded_weight)
+
     def test_produces_actionable_repair_hints(self) -> None:
         baseline = {"search": {"type": "object"}}
         candidate = {

@@ -15,6 +15,20 @@ def report_to_dict(report: CompatibilityReport) -> dict[str, Any]:
             "eligible_weight": report.eligible_weight,
             "passing_weight": report.passing_weight,
         },
+        "tools": [
+            {
+                "tool": summary.tool,
+                "score": summary.score,
+                "passed": summary.passed,
+                "broken": summary.broken,
+                "excluded": summary.excluded,
+                "eligible_weight": summary.eligible_weight,
+                "passing_weight": summary.passing_weight,
+                "risk_weight": summary.risk_weight,
+                "excluded_weight": summary.excluded_weight,
+            }
+            for summary in report.tool_summaries
+        ],
         "results": [
             {
                 "trace_id": result.trace.trace_id,
@@ -75,6 +89,15 @@ def render_text(report: CompatibilityReport) -> str:
         (f"Calls: {report.passed} passed, {report.broken} broken, {report.excluded} excluded"),
         (f"Observed weight: {report.passing_weight:g}/{report.eligible_weight:g} compatible"),
     ]
+    if report.tool_summaries:
+        lines.append("")
+        lines.append("Tool risk")
+        for summary in report.tool_summaries:
+            lines.append(
+                f"- {summary.tool}: {summary.score:.2f}/100 "
+                f"(risk weight {summary.risk_weight:g}; "
+                f"{summary.broken} broken, {summary.excluded} excluded)"
+            )
     for result in report.results:
         if result.status == "passed":
             continue

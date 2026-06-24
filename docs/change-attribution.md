@@ -26,6 +26,17 @@ before/after values produces a different ID.
 Only aligned schema locations are compared. AgentCompat does not claim semantic equivalence for
 arbitrary `allOf`, `anyOf`, or `oneOf` rewrites.
 
+## Tool risk summaries
+
+The `tools` JSON array summarizes observed compatibility by tool. Each item includes the tool
+name, score, passed/broken/excluded counts, eligible weight, passing weight, `risk_weight`
+(eligible weight that failed under the candidate), and `excluded_weight` (baseline-invalid
+weight omitted from the score).
+
+Items are sorted by highest `risk_weight`, then broken call count, excluded weight, and tool
+name. This keeps the most compatibility-sensitive tools visible even when the full result list
+is long.
+
 ## Failure links
 
 Every result issue contains a `change_ids` array. Candidate failures are linked using:
@@ -58,6 +69,19 @@ effort or business priority beyond the weights supplied in the trace file.
 
 ```json
 {
+  "tools": [
+    {
+      "tool": "search_orders",
+      "score": 0.0,
+      "passed": 0,
+      "broken": 1,
+      "excluded": 0,
+      "eligible_weight": 2.0,
+      "passing_weight": 0.0,
+      "risk_weight": 2.0,
+      "excluded_weight": 0.0
+    }
+  ],
   "changes": [
     {
       "change_id": "chg_d7a493cd0fb45aeb",

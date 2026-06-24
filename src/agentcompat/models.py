@@ -56,6 +56,19 @@ class MigrationPlanItem:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolSummary:
+    tool: str
+    score: float
+    passed: int
+    broken: int
+    excluded: int
+    eligible_weight: float
+    passing_weight: float
+    risk_weight: float
+    excluded_weight: float
+
+
+@dataclass(frozen=True, slots=True)
 class CompatibilityReport:
     score: float
     passed: int
@@ -66,6 +79,7 @@ class CompatibilityReport:
     results: tuple[TraceResult, ...]
     changes: tuple[SchemaChange, ...] = ()
     migration_plan: tuple[MigrationPlanItem, ...] = ()
+    tool_summaries: tuple[ToolSummary, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

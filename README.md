@@ -100,9 +100,10 @@ OpenAI-style `function.parameters` is also accepted. Traces are JSON Lines:
 ```
 
 `weight` defaults to `1.0` and must be positive. Inputs are capped at 10 MiB per file and
-10,000 traces by default. Local `$ref` files must remain beneath the bundle directory;
-traversal, remote references, missing pointers, and cycles are rejected. AgentCompat performs
-no network requests and never executes trace content.
+10,000 traces by default. Trace records are streamed into replay, so adapter parsing and
+redaction do not require building a separate in-memory list before analysis. Local `$ref` files
+must remain beneath the bundle directory; traversal, remote references, missing pointers, and
+cycles are rejected. AgentCompat performs no network requests and never executes trace content.
 
 Trace files can also use provider-shaped records:
 
@@ -140,6 +141,9 @@ Score: 53.85/100
 Calls: 2 passed, 4 broken, 1 excluded
 Observed weight: 7/13 compatible
 
+Tool risk
+- search_orders: 45.45/100 (risk weight 6; 4 broken, 1 excluded)
+
 Migration plan
 1. [required_added] search_orders $.customer_id (weight 2; 1 trace)
 2. [enum_narrowed] search_orders $.status (weight 2; 1 trace)
@@ -147,9 +151,10 @@ Migration plan
 
 Each broken issue includes the `change_id` that caused it. The plan groups repeated failures by
 change, counts each affected trace weight once, and sorts by affected weight, trace count, then
-stable structural keys. Use `--format json` for the complete `changes`, per-issue `change_ids`,
-and `migration_plan` arrays. See [Change attribution](docs/change-attribution.md) for the
-machine-readable contract.
+stable structural keys. The `tools` JSON array gives per-tool score, call counts, compatible
+weight, incompatible eligible weight, and excluded baseline-invalid weight. Use `--format json`
+for the complete `changes`, per-issue `change_ids`, `tools`, and `migration_plan` arrays. See
+[Change attribution](docs/change-attribution.md) for the machine-readable contract.
 
 Exit code `1` means the score is below `--fail-under`; malformed or unsafe input limits return
 `2`.
