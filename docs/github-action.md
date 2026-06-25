@@ -55,6 +55,8 @@ The default policy file is `.agentcompat.json` when present. You can also pass a
   "trace_format": "openai",
   "fail_under": 95,
   "max_traces": 10000,
+  "sample_size": 1000,
+  "sample_seed": 17,
   "redact_paths": ["$.customer.email"],
   "redact_key_patterns": ["token|secret|api[_-]?key"],
   "changed_schema_discovery": {
@@ -77,12 +79,16 @@ Supported policy keys:
 - `trace_format`: `canonical`, `openai`, `anthropic`, `mcp`, or `langchain`.
 - `fail_under`: minimum score from `0` through `100`.
 - `max_traces`: positive trace count cap.
+- `sample_size`: optional deterministic weighted stratified sample size.
+- `sample_seed`: integer seed used when `sample_size` is set.
 - `redact_paths`: exact argument JSON paths to redact before replay.
 - `redact_key_patterns`: regular expressions matching argument keys to redact.
 - `changed_schema_discovery.globs`: candidate schema globs used when `candidate` is omitted.
 
 Every policy value can be overridden by action inputs. Newline-separated `redact-paths` and
 `redact-key-patterns` inputs are appended as repeated CLI flags.
+Sampled runs include the selected call count, population count, seed, and sampled weight in the
+job summary and JSON report.
 
 ## Outputs
 

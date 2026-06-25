@@ -91,6 +91,80 @@ class CheckCommandTests(unittest.TestCase):
         self.assertEqual("required_added", payload["migration_plan"][0]["kind"])
         self.assertEqual(["trace-1"], payload["migration_plan"][0]["trace_ids"])
 
+    def test_check_accepts_seeded_sample_size(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline = root / "baseline.json"
+            candidate = root / "candidate.json"
+            traces = root / "traces.jsonl"
+            bundle = {
+                "tools": [
+                    {"name": "search", "inputSchema": {"type": "object"}},
+                    {"name": "lookup", "inputSchema": {"type": "object"}},
+                ]
+            }
+            baseline.write_text(json.dumps(bundle), encoding="utf-8")
+            candidate.write_text(json.dumps(bundle), encoding="utf-8")
+            traces.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "trace_id": "search-heavy",
+                                "tool": "search",
+                                "arguments": {},
+                                "weight": 100,
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "trace_id": "search-light",
+                                "tool": "search",
+                                "arguments": {},
+                                "weight": 1,
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "trace_id": "lookup",
+                                "tool": "lookup",
+                                "arguments": {},
+                                "weight": 1,
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "check",
+                        "--baseline",
+                        str(baseline),
+                        "--candidate",
+                        str(candidate),
+                        "--traces",
+                        str(traces),
+                        "--sample-size",
+                        "2",
+                        "--sample-seed",
+                        "17",
+                        "--format",
+                        "json",
+                    ]
+                )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(0, exit_code)
+        self.assertEqual(2, payload["sampling"]["sampled"])
+        self.assertEqual(3, payload["sampling"]["population"])
+        self.assertEqual(17, payload["sampling"]["seed"])
+        self.assertEqual(2, len(payload["results"]))
+
     def test_audit_reports_unsupported_schema_keywords(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             bundle = Path(directory) / "bundle.json"

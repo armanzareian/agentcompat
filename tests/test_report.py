@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 from agentcompat.models import (
     CompatibilityReport,
     MigrationPlanItem,
+    SamplingStratum,
+    SamplingSummary,
     SchemaChange,
     ToolCall,
     ToolSummary,
@@ -79,12 +81,30 @@ class ReportTests(unittest.TestCase):
                     excluded_weight=0.0,
                 ),
             ),
+            sampling=SamplingSummary(
+                requested_size=5,
+                seed=17,
+                population=10,
+                sampled=5,
+                population_weight=20.0,
+                sampled_weight=12.0,
+                strata=(
+                    SamplingStratum(
+                        tool="search",
+                        population=10,
+                        sampled=5,
+                        population_weight=20.0,
+                        sampled_weight=12.0,
+                    ),
+                ),
+            ),
         )
 
         rendered = render_text(report)
         payload = report_to_dict(report)
 
         self.assertIn("Score: 50.00/100", rendered)
+        self.assertIn("Sampling: 5/10 calls selected with seed 17", rendered)
         self.assertNotIn("PASSED passed", rendered)
         self.assertIn("BROKEN broken", rendered)
         self.assertIn("Hint: Provide query.", rendered)
@@ -128,6 +148,26 @@ class ReportTests(unittest.TestCase):
                 "guidance": "Populate $.query for search calls.",
             },
             payload["migration_plan"][0],
+        )
+        self.assertEqual(
+            {
+                "requested_size": 5,
+                "seed": 17,
+                "population": 10,
+                "sampled": 5,
+                "population_weight": 20.0,
+                "sampled_weight": 12.0,
+                "strata": [
+                    {
+                        "tool": "search",
+                        "population": 10,
+                        "sampled": 5,
+                        "population_weight": 20.0,
+                        "sampled_weight": 12.0,
+                    }
+                ],
+            },
+            payload["sampling"],
         )
 
 

@@ -25,6 +25,8 @@ for local development and CI.
   weighted, deduplicated migration work.
 - **Trace adapters with redaction:** read common OpenAI, Anthropic, MCP, and LangChain tool-call
   records while scrubbing configured fields before replay.
+- **Seeded sampled replay:** score deterministic weighted samples when trace populations are too
+  large for exact local review.
 - **Measurable evaluation:** labeled suites report precision, recall, F1, and root-cause accuracy.
 - **Provider-neutral input:** normalize MCP-style and OpenAI-style tool bundles.
 
@@ -105,6 +107,24 @@ redaction do not require building a separate in-memory list before analysis. Loc
 must remain beneath the bundle directory; traversal, remote references, missing pointers, and
 cycles are rejected. AgentCompat performs no network requests and never executes trace content.
 
+For large trace populations, pass `--sample-size` to score a deterministic weighted stratified
+sample instead of every parsed trace:
+
+```bash
+agentcompat check \
+  --baseline examples/order-api/baseline.json \
+  --candidate examples/order-api/candidate.json \
+  --traces examples/order-api/traces.jsonl \
+  --sample-size 1000 \
+  --sample-seed 17 \
+  --format json
+```
+
+Sampling allocates records across tool strata by observed trace weight, selects within each
+tool using seeded weighted priorities, and preserves the original order of selected traces in
+the report. JSON output includes the population, selected count, seed, sampled weight, and
+per-tool sampling strata so sampled scores can be reproduced and audited.
+
 Trace files can also use provider-shaped records:
 
 ```bash
@@ -152,9 +172,10 @@ Migration plan
 Each broken issue includes the `change_id` that caused it. The plan groups repeated failures by
 change, counts each affected trace weight once, and sorts by affected weight, trace count, then
 stable structural keys. The `tools` JSON array gives per-tool score, call counts, compatible
-weight, incompatible eligible weight, and excluded baseline-invalid weight. Use `--format json`
-for the complete `changes`, per-issue `change_ids`, `tools`, and `migration_plan` arrays. See
-[Change attribution](docs/change-attribution.md) for the machine-readable contract.
+weight, incompatible eligible weight, and excluded baseline-invalid weight. Sampled runs also
+include a top-level `sampling` object with population and stratum metadata. Use `--format json`
+for the complete `changes`, per-issue `change_ids`, `tools`, `sampling`, and `migration_plan`
+arrays. See [Change attribution](docs/change-attribution.md) for the machine-readable contract.
 
 Exit code `1` means the score is below `--fail-under`; malformed or unsafe input limits return
 `2`.

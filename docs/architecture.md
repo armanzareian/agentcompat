@@ -68,6 +68,15 @@ Reports also aggregate per-tool score, broken call count, excluded call count, c
 eligible weight, and incompatible eligible weight so high-risk tools can be identified without
 post-processing every trace result.
 
+Checks can optionally run against a seeded weighted stratified sample. Sampling happens after
+trace normalization/redaction and before baseline replay. Tool names define strata, requested
+sample slots are allocated by observed stratum weight with at least one record per populated
+tool when the sample budget allows, and records inside each tool are selected by deterministic
+weighted priorities derived from the trace ID, stream position, tool name, and seed. Selected
+traces keep their original stream order for replay. The report records population size,
+population weight, sampled count, sampled weight, seed, and per-tool stratum metadata so a
+sampled score can be reproduced.
+
 ### Change attribution
 
 `agentcompat.changes` compares normalized baseline and candidate bundles before replay. It emits

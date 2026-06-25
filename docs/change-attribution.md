@@ -37,6 +37,12 @@ Items are sorted by highest `risk_weight`, then broken call count, excluded weig
 name. This keeps the most compatibility-sensitive tools visible even when the full result list
 is long.
 
+## Sampling metadata
+
+Sampled checks include a top-level `sampling` object. It records the requested sample size,
+seed, total parsed population, selected trace count, total population weight, selected weight,
+and per-tool strata with population and selected counts. Exact checks omit this object.
+
 ## Failure links
 
 Every result issue contains a `change_ids` array. Candidate failures are linked using:
@@ -82,6 +88,23 @@ effort or business priority beyond the weights supplied in the trace file.
       "excluded_weight": 0.0
     }
   ],
+  "sampling": {
+    "requested_size": 1000,
+    "seed": 17,
+    "population": 50000,
+    "sampled": 1000,
+    "population_weight": 72500.0,
+    "sampled_weight": 1440.0,
+    "strata": [
+      {
+        "tool": "search_orders",
+        "population": 50000,
+        "sampled": 1000,
+        "population_weight": 72500.0,
+        "sampled_weight": 1440.0
+      }
+    ]
+  },
   "changes": [
     {
       "change_id": "chg_d7a493cd0fb45aeb",

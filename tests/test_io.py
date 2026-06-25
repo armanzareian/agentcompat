@@ -218,10 +218,7 @@ class TraceReaderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "traces.jsonl"
             path.write_text(
-                (
-                    '{"trace_id":"trace-1","tool":"search","arguments":{"query":"x"}}\n'
-                    "{not json}\n"
-                ),
+                ('{"trace_id":"trace-1","tool":"search","arguments":{"query":"x"}}\n{not json}\n'),
                 encoding="utf-8",
             )
 

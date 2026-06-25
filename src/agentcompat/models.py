@@ -69,6 +69,26 @@ class ToolSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class SamplingStratum:
+    tool: str
+    population: int
+    sampled: int
+    population_weight: float
+    sampled_weight: float
+
+
+@dataclass(frozen=True, slots=True)
+class SamplingSummary:
+    requested_size: int
+    seed: int
+    population: int
+    sampled: int
+    population_weight: float
+    sampled_weight: float
+    strata: tuple[SamplingStratum, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class CompatibilityReport:
     score: float
     passed: int
@@ -80,6 +100,7 @@ class CompatibilityReport:
     changes: tuple[SchemaChange, ...] = ()
     migration_plan: tuple[MigrationPlanItem, ...] = ()
     tool_summaries: tuple[ToolSummary, ...] = ()
+    sampling: SamplingSummary | None = None
 
 
 @dataclass(frozen=True, slots=True)

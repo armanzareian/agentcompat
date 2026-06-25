@@ -30,6 +30,8 @@ class GitHubActionTests(unittest.TestCase):
                         "traces": traces.name,
                         "trace_format": "canonical",
                         "fail_under": 80,
+                        "sample_size": 1,
+                        "sample_seed": 17,
                         "changed_schema_discovery": {
                             "enabled": True,
                             "globs": ["schemas/*.json"],
@@ -60,9 +62,12 @@ class GitHubActionTests(unittest.TestCase):
             payload = json.loads(report.read_text(encoding="utf-8"))
             self.assertEqual(0.0, payload["summary"]["score"])
             self.assertEqual(1, payload["summary"]["broken"])
+            self.assertEqual(1, payload["sampling"]["sampled"])
+            self.assertEqual(17, payload["sampling"]["seed"])
             summary_text = summary.read_text(encoding="utf-8")
             self.assertIn("AgentCompat compatibility", summary_text)
             self.assertIn("Score: 0.00/100", summary_text)
+            self.assertIn("Sampling: 1/1 calls selected with seed 17", summary_text)
             self.assertIn("[trace-1](#trace-trace-1)", summary_text)
             output_text = outputs.read_text(encoding="utf-8")
             self.assertIn("score=0.00", output_text)

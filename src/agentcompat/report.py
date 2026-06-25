@@ -6,7 +6,7 @@ from agentcompat.models import CompatibilityReport, EvaluationMetrics
 
 
 def report_to_dict(report: CompatibilityReport) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "summary": {
             "score": report.score,
             "passed": report.passed,
@@ -80,6 +80,26 @@ def report_to_dict(report: CompatibilityReport) -> dict[str, Any]:
             for rank, item in enumerate(report.migration_plan, start=1)
         ],
     }
+    if report.sampling is not None:
+        payload["sampling"] = {
+            "requested_size": report.sampling.requested_size,
+            "seed": report.sampling.seed,
+            "population": report.sampling.population,
+            "sampled": report.sampling.sampled,
+            "population_weight": report.sampling.population_weight,
+            "sampled_weight": report.sampling.sampled_weight,
+            "strata": [
+                {
+                    "tool": stratum.tool,
+                    "population": stratum.population,
+                    "sampled": stratum.sampled,
+                    "population_weight": stratum.population_weight,
+                    "sampled_weight": stratum.sampled_weight,
+                }
+                for stratum in report.sampling.strata
+            ],
+        }
+    return payload
 
 
 def render_text(report: CompatibilityReport) -> str:
@@ -89,6 +109,16 @@ def render_text(report: CompatibilityReport) -> str:
         (f"Calls: {report.passed} passed, {report.broken} broken, {report.excluded} excluded"),
         (f"Observed weight: {report.passing_weight:g}/{report.eligible_weight:g} compatible"),
     ]
+    if report.sampling is not None:
+        lines.append(
+            "Sampling: "
+            f"{report.sampling.sampled}/{report.sampling.population} calls selected "
+            f"with seed {report.sampling.seed}"
+        )
+        lines.append(
+            "Sampled weight: "
+            f"{report.sampling.sampled_weight:g}/{report.sampling.population_weight:g}"
+        )
     if report.tool_summaries:
         lines.append("")
         lines.append("Tool risk")

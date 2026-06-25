@@ -30,6 +30,14 @@ inputs:
     description: Maximum trace records to replay.
     required: false
     default: ""
+  sample-size:
+    description: Optional deterministic weighted stratified sample size.
+    required: false
+    default: ""
+  sample-seed:
+    description: Seed for deterministic sampling when sample-size is set.
+    required: false
+    default: ""
   redact-paths:
     description: Newline-separated exact argument JSON paths to redact before replay.
     required: false
@@ -81,6 +89,8 @@ runs:
         AGENTCOMPAT_TRACE_FORMAT: ${{ inputs.trace-format }}
         AGENTCOMPAT_FAIL_UNDER: ${{ inputs.fail-under }}
         AGENTCOMPAT_MAX_TRACES: ${{ inputs.max-traces }}
+        AGENTCOMPAT_SAMPLE_SIZE: ${{ inputs.sample-size }}
+        AGENTCOMPAT_SAMPLE_SEED: ${{ inputs.sample-seed }}
         AGENTCOMPAT_REDACT_PATHS: ${{ inputs.redact-paths }}
         AGENTCOMPAT_REDACT_KEY_PATTERNS: ${{ inputs.redact-key-patterns }}
         AGENTCOMPAT_REPORT_JSON: ${{ inputs.report-json }}
@@ -109,6 +119,12 @@ runs:
         fi
         if [ -n "$AGENTCOMPAT_MAX_TRACES" ]; then
           args+=(--max-traces "$AGENTCOMPAT_MAX_TRACES")
+        fi
+        if [ -n "$AGENTCOMPAT_SAMPLE_SIZE" ]; then
+          args+=(--sample-size "$AGENTCOMPAT_SAMPLE_SIZE")
+        fi
+        if [ -n "$AGENTCOMPAT_SAMPLE_SEED" ]; then
+          args+=(--sample-seed "$AGENTCOMPAT_SAMPLE_SEED")
         fi
         if [ -n "$AGENTCOMPAT_REPORT_JSON" ]; then
           args+=(--report-json "$AGENTCOMPAT_REPORT_JSON")

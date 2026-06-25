@@ -63,6 +63,8 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--format", choices=("text", "json"), default="text")
     check.add_argument("--fail-under", type=_score, default=100.0)
     check.add_argument("--max-traces", type=int, default=10_000)
+    check.add_argument("--sample-size", type=_positive_int)
+    check.add_argument("--sample-seed", type=int, default=0)
 
     audit = subparsers.add_parser(
         "audit",
@@ -90,6 +92,8 @@ def _run_check(args: argparse.Namespace) -> int:
                 key_patterns=tuple(args.redact_key_pattern),
             ),
         ),
+        sample_size=args.sample_size,
+        sample_seed=args.sample_seed,
     )
     if args.format == "json":
         print(json.dumps(report_to_dict(report), indent=2, sort_keys=True))
@@ -220,3 +224,10 @@ def _score(value: str) -> float:
     if not 0 <= score <= 100:
         raise argparse.ArgumentTypeError("score must be between 0 and 100")
     return score
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive integer")
+    return parsed

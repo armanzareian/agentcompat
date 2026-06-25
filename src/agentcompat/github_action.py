@@ -49,6 +49,8 @@ def main(
                     key_patterns=tuple(settings.redact_key_patterns),
                 ),
             ),
+            sample_size=settings.sample_size,
+            sample_seed=settings.sample_seed,
         )
         report_payload = report_to_dict(report)
         _write_json(settings.report_json, report_payload)
@@ -72,6 +74,8 @@ class _ActionSettings:
         trace_format: str,
         fail_under: float,
         max_traces: int,
+        sample_size: int | None,
+        sample_seed: int,
         redact_paths: tuple[str, ...],
         redact_key_patterns: tuple[str, ...],
         report_json: Path,
@@ -83,6 +87,8 @@ class _ActionSettings:
         self.trace_format = trace_format
         self.fail_under = fail_under
         self.max_traces = max_traces
+        self.sample_size = sample_size
+        self.sample_seed = sample_seed
         self.redact_paths = redact_paths
         self.redact_key_patterns = redact_key_patterns
         self.report_json = report_json
@@ -101,6 +107,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trace-format")
     parser.add_argument("--fail-under", type=float)
     parser.add_argument("--max-traces", type=int)
+    parser.add_argument("--sample-size", type=int)
+    parser.add_argument("--sample-seed", type=int)
     parser.add_argument("--redact-path", action="append")
     parser.add_argument("--redact-key-pattern", action="append")
     parser.add_argument("--report-json", type=Path, default=Path("agentcompat-report.json"))
@@ -141,6 +149,12 @@ def _settings_from_sources(
     if max_traces <= 0:
         raise InputError("max_traces must be a positive integer.")
 
+    sample_size = _optional_int_setting(args.sample_size, config, "sample_size")
+    if sample_size is not None and sample_size <= 0:
+        raise InputError("sample_size must be a positive integer.")
+
+    sample_seed = _int_setting(args.sample_seed, config, "sample_seed", 0)
+
     baseline = _required_path(args.baseline, config, "baseline", cwd)
     candidate = _optional_path(args.candidate, config, "candidate", cwd)
     if candidate is None:
@@ -154,6 +168,8 @@ def _settings_from_sources(
         trace_format=trace_format,
         fail_under=fail_under,
         max_traces=max_traces,
+        sample_size=sample_size,
+        sample_seed=sample_seed,
         redact_paths=_list_setting(args.redact_path, config, "redact_paths"),
         redact_key_patterns=_list_setting(
             args.redact_key_pattern,
@@ -202,6 +218,21 @@ def _int_setting(
     if value is not None:
         return value
     configured = config.get(key, default)
+    if isinstance(configured, bool) or not isinstance(configured, int):
+        raise InputError(f"{key} must be an integer.")
+    return configured
+
+
+def _optional_int_setting(
+    value: int | None,
+    config: dict[str, Any],
+    key: str,
+) -> int | None:
+    if value is not None:
+        return value
+    configured = config.get(key)
+    if configured is None:
+        return None
     if isinstance(configured, bool) or not isinstance(configured, int):
         raise InputError(f"{key} must be an integer.")
     return configured
@@ -331,8 +362,31 @@ def _render_summary(report: CompatibilityReport, settings: _ActionSettings, cwd:
         f"| Broken calls | {report.broken} |",
         f"| Excluded calls | {report.excluded} |",
         f"| Compatible weight | {report.passing_weight:g}/{report.eligible_weight:g} |",
-        "",
     ]
+    if report.sampling is not None:
+        lines.extend(
+            [
+                (
+                    "| Sampling | "
+                    f"{report.sampling.sampled}/{report.sampling.population} calls, "
+                    f"seed {report.sampling.seed} |"
+                ),
+                (
+                    "| Sampled weight | "
+                    f"{report.sampling.sampled_weight:g}/"
+                    f"{report.sampling.population_weight:g} |"
+                ),
+                "",
+                (
+                    "Sampling: "
+                    f"{report.sampling.sampled}/{report.sampling.population} calls selected "
+                    f"with seed {report.sampling.seed}"
+                ),
+                "",
+            ]
+        )
+    else:
+        lines.append("")
 
     if broken_results:
         lines.extend(["## Broken traces", ""])

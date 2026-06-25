@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
@@ -61,7 +62,7 @@ class AnalyzeCompatibilityTests(unittest.TestCase):
         self.assertEqual("tool_removed", report.results[0].issues[0].code)
 
     def test_summarizes_weighted_risk_by_tool(self) -> None:
-        baseline = {
+        baseline: dict[str, dict[str, Any]] = {
             "lookup": {"type": "object"},
             "search": {
                 "type": "object",
@@ -73,7 +74,7 @@ class AnalyzeCompatibilityTests(unittest.TestCase):
                 "additionalProperties": False,
             },
         }
-        candidate = {
+        candidate: dict[str, dict[str, Any]] = {
             "lookup": {"type": "object"},
             "search": {
                 "type": "object",
@@ -104,6 +105,55 @@ class AnalyzeCompatibilityTests(unittest.TestCase):
         self.assertEqual(3.0, search.passing_weight)
         self.assertEqual(2.0, search.risk_weight)
         self.assertEqual(5.0, search.excluded_weight)
+
+    def test_samples_weighted_tool_strata_deterministically(self) -> None:
+        baseline: dict[str, dict[str, Any]] = {
+            "lookup": {"type": "object"},
+            "search": {"type": "object"},
+        }
+        candidate: dict[str, dict[str, Any]] = {
+            "lookup": {"type": "object"},
+            "search": {"type": "object"},
+        }
+        traces = [
+            ToolCall("search-heavy", "search", {"query": "orders"}, 100),
+            ToolCall("search-light-1", "search", {"query": "orders"}, 1),
+            ToolCall("search-light-2", "search", {"query": "orders"}, 1),
+            ToolCall("lookup-1", "lookup", {}, 1),
+            ToolCall("lookup-2", "lookup", {}, 1),
+        ]
+
+        first = analyze_compatibility(
+            baseline,
+            candidate,
+            traces,
+            sample_size=3,
+            sample_seed=17,
+        )
+        second = analyze_compatibility(
+            baseline,
+            candidate,
+            traces,
+            sample_size=3,
+            sample_seed=17,
+        )
+
+        self.assertEqual(
+            [result.trace.trace_id for result in first.results],
+            [result.trace.trace_id for result in second.results],
+        )
+        self.assertEqual(3, len(first.results))
+        self.assertIn("search-heavy", [result.trace.trace_id for result in first.results])
+        assert first.sampling is not None
+        sampling = first.sampling
+        self.assertEqual(
+            {"search": 2, "lookup": 1},
+            {summary.tool: summary.sampled for summary in sampling.strata},
+        )
+        self.assertEqual(5, sampling.population)
+        self.assertEqual(104.0, sampling.population_weight)
+        self.assertEqual(3, sampling.sampled)
+        self.assertEqual(17, sampling.seed)
 
     def test_produces_actionable_repair_hints(self) -> None:
         baseline = {"search": {"type": "object"}}
