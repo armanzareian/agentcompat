@@ -38,6 +38,18 @@ inputs:
     description: Seed for deterministic sampling when sample-size is set.
     required: false
     default: ""
+  bootstrap-iterations:
+    description: Optional deterministic bootstrap iteration count for score confidence intervals.
+    required: false
+    default: ""
+  confidence-level:
+    description: Confidence level for bootstrap score intervals, such as 0.95.
+    required: false
+    default: ""
+  score-tolerance:
+    description: Optional reporting tolerance for sampled score comparisons.
+    required: false
+    default: ""
   redact-paths:
     description: Newline-separated exact argument JSON paths to redact before replay.
     required: false
@@ -68,6 +80,12 @@ outputs:
   excluded:
     description: Number of baseline-invalid or unknown-tool calls excluded from the score.
     value: ${{ steps.agentcompat.outputs.excluded }}
+  score-lower:
+    description: Lower bootstrap confidence bound when enabled.
+    value: ${{ steps.agentcompat.outputs.score-lower }}
+  score-upper:
+    description: Upper bootstrap confidence bound when enabled.
+    value: ${{ steps.agentcompat.outputs.score-upper }}
   report-json:
     description: Path to the JSON report.
     value: ${{ steps.agentcompat.outputs.report-json }}
@@ -91,6 +109,9 @@ runs:
         AGENTCOMPAT_MAX_TRACES: ${{ inputs.max-traces }}
         AGENTCOMPAT_SAMPLE_SIZE: ${{ inputs.sample-size }}
         AGENTCOMPAT_SAMPLE_SEED: ${{ inputs.sample-seed }}
+        AGENTCOMPAT_BOOTSTRAP_ITERATIONS: ${{ inputs.bootstrap-iterations }}
+        AGENTCOMPAT_CONFIDENCE_LEVEL: ${{ inputs.confidence-level }}
+        AGENTCOMPAT_SCORE_TOLERANCE: ${{ inputs.score-tolerance }}
         AGENTCOMPAT_REDACT_PATHS: ${{ inputs.redact-paths }}
         AGENTCOMPAT_REDACT_KEY_PATTERNS: ${{ inputs.redact-key-patterns }}
         AGENTCOMPAT_REPORT_JSON: ${{ inputs.report-json }}
@@ -125,6 +146,15 @@ runs:
         fi
         if [ -n "$AGENTCOMPAT_SAMPLE_SEED" ]; then
           args+=(--sample-seed "$AGENTCOMPAT_SAMPLE_SEED")
+        fi
+        if [ -n "$AGENTCOMPAT_BOOTSTRAP_ITERATIONS" ]; then
+          args+=(--bootstrap-iterations "$AGENTCOMPAT_BOOTSTRAP_ITERATIONS")
+        fi
+        if [ -n "$AGENTCOMPAT_CONFIDENCE_LEVEL" ]; then
+          args+=(--confidence-level "$AGENTCOMPAT_CONFIDENCE_LEVEL")
+        fi
+        if [ -n "$AGENTCOMPAT_SCORE_TOLERANCE" ]; then
+          args+=(--score-tolerance "$AGENTCOMPAT_SCORE_TOLERANCE")
         fi
         if [ -n "$AGENTCOMPAT_REPORT_JSON" ]; then
           args+=(--report-json "$AGENTCOMPAT_REPORT_JSON")

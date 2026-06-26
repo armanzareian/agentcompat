@@ -25,8 +25,8 @@ for local development and CI.
   weighted, deduplicated migration work.
 - **Trace adapters with redaction:** read common OpenAI, Anthropic, MCP, and LangChain tool-call
   records while scrubbing configured fields before replay.
-- **Seeded sampled replay:** score deterministic weighted samples when trace populations are too
-  large for exact local review.
+- **Seeded sampled replay:** score deterministic weighted samples with optional bootstrap
+  confidence intervals when trace populations are too large for exact local review.
 - **Measurable evaluation:** labeled suites report precision, recall, F1, and root-cause accuracy.
 - **Provider-neutral input:** normalize MCP-style and OpenAI-style tool bundles.
 
@@ -117,6 +117,8 @@ agentcompat check \
   --traces examples/order-api/traces.jsonl \
   --sample-size 1000 \
   --sample-seed 17 \
+  --bootstrap-iterations 1000 \
+  --confidence-level 0.95 \
   --format json
 ```
 
@@ -124,6 +126,11 @@ Sampling allocates records across tool strata by observed trace weight, selects 
 tool using seeded weighted priorities, and preserves the original order of selected traces in
 the report. JSON output includes the population, selected count, seed, sampled weight, and
 per-tool sampling strata so sampled scores can be reproduced and audited.
+
+Add `--bootstrap-iterations` to include a deterministic percentile confidence interval for the
+weighted score. Bootstrap resamples the eligible sampled calls with replacement using the same
+seed and reports lower and upper score bounds in the JSON `confidence_interval` object and text
+output. `--confidence-level` defaults to `0.95`.
 
 Trace files can also use provider-shaped records:
 
@@ -174,8 +181,9 @@ change, counts each affected trace weight once, and sorts by affected weight, tr
 stable structural keys. The `tools` JSON array gives per-tool score, call counts, compatible
 weight, incompatible eligible weight, and excluded baseline-invalid weight. Sampled runs also
 include a top-level `sampling` object with population and stratum metadata. Use `--format json`
-for the complete `changes`, per-issue `change_ids`, `tools`, `sampling`, and `migration_plan`
-arrays. See [Change attribution](docs/change-attribution.md) for the machine-readable contract.
+for the complete `changes`, per-issue `change_ids`, `tools`, `sampling`,
+`confidence_interval`, and `migration_plan` arrays. See
+[Change attribution](docs/change-attribution.md) for the machine-readable contract.
 
 Exit code `1` means the score is below `--fail-under`; malformed or unsafe input limits return
 `2`.
@@ -198,8 +206,8 @@ steps:
       config: .agentcompat.json
 ```
 
-The action writes a pull-request job summary with links to affected trace IDs, exposes score and
-call-count outputs, and generates JSON plus SARIF reports. See the
+The action writes a pull-request job summary with links to affected trace IDs, exposes score,
+optional confidence-bound, and call-count outputs, and generates JSON plus SARIF reports. See the
 [GitHub Action guide](docs/github-action.md) for policy configuration, changed-schema discovery,
 read-only workflow permissions, and fixture outcomes.
 

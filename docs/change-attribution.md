@@ -43,6 +43,13 @@ Sampled checks include a top-level `sampling` object. It records the requested s
 seed, total parsed population, selected trace count, total population weight, selected weight,
 and per-tool strata with population and selected counts. Exact checks omit this object.
 
+## Confidence interval metadata
+
+Checks run with bootstrap iterations include a top-level `confidence_interval` object. It
+records the metric, confidence level, lower and upper score bounds, iteration count, and seed.
+The current metric is `score`. Bounds are percentages on the same `0` through `100` scale as
+the compatibility score.
+
 ## Failure links
 
 Every result issue contains a `change_ids` array. Candidate failures are linked using:
@@ -104,6 +111,14 @@ effort or business priority beyond the weights supplied in the trace file.
         "sampled_weight": 1440.0
       }
     ]
+  },
+  "confidence_interval": {
+    "metric": "score",
+    "confidence_level": 0.95,
+    "lower": 0.0,
+    "upper": 12.5,
+    "iterations": 1000,
+    "seed": 17
   },
   "changes": [
     {

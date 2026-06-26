@@ -51,6 +51,8 @@ def main(
             ),
             sample_size=settings.sample_size,
             sample_seed=settings.sample_seed,
+            bootstrap_iterations=settings.bootstrap_iterations,
+            confidence_level=settings.confidence_level,
         )
         report_payload = report_to_dict(report)
         _write_json(settings.report_json, report_payload)
@@ -76,6 +78,9 @@ class _ActionSettings:
         max_traces: int,
         sample_size: int | None,
         sample_seed: int,
+        bootstrap_iterations: int,
+        confidence_level: float,
+        score_tolerance: float,
         redact_paths: tuple[str, ...],
         redact_key_patterns: tuple[str, ...],
         report_json: Path,
@@ -89,6 +94,9 @@ class _ActionSettings:
         self.max_traces = max_traces
         self.sample_size = sample_size
         self.sample_seed = sample_seed
+        self.bootstrap_iterations = bootstrap_iterations
+        self.confidence_level = confidence_level
+        self.score_tolerance = score_tolerance
         self.redact_paths = redact_paths
         self.redact_key_patterns = redact_key_patterns
         self.report_json = report_json
@@ -109,6 +117,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-traces", type=int)
     parser.add_argument("--sample-size", type=int)
     parser.add_argument("--sample-seed", type=int)
+    parser.add_argument("--bootstrap-iterations", type=int)
+    parser.add_argument("--confidence-level", type=float)
+    parser.add_argument("--score-tolerance", type=float)
     parser.add_argument("--redact-path", action="append")
     parser.add_argument("--redact-key-pattern", action="append")
     parser.add_argument("--report-json", type=Path, default=Path("agentcompat-report.json"))
@@ -155,6 +166,23 @@ def _settings_from_sources(
 
     sample_seed = _int_setting(args.sample_seed, config, "sample_seed", 0)
 
+    bootstrap_iterations = _int_setting(
+        args.bootstrap_iterations,
+        config,
+        "bootstrap_iterations",
+        0,
+    )
+    if bootstrap_iterations < 0:
+        raise InputError("bootstrap_iterations must be non-negative.")
+
+    confidence_level = _float_setting(args.confidence_level, config, "confidence_level", 0.95)
+    if not 0 < confidence_level < 1:
+        raise InputError("confidence_level must be greater than 0 and less than 1.")
+
+    score_tolerance = _float_setting(args.score_tolerance, config, "score_tolerance", 0.0)
+    if not 0 <= score_tolerance <= 100:
+        raise InputError("score_tolerance must be between 0 and 100.")
+
     baseline = _required_path(args.baseline, config, "baseline", cwd)
     candidate = _optional_path(args.candidate, config, "candidate", cwd)
     if candidate is None:
@@ -170,6 +198,9 @@ def _settings_from_sources(
         max_traces=max_traces,
         sample_size=sample_size,
         sample_seed=sample_seed,
+        bootstrap_iterations=bootstrap_iterations,
+        confidence_level=confidence_level,
+        score_tolerance=score_tolerance,
         redact_paths=_list_setting(args.redact_path, config, "redact_paths"),
         redact_key_patterns=_list_setting(
             args.redact_key_pattern,
@@ -341,6 +372,9 @@ def _append_outputs(
         "report-json": _display_path(settings.report_json, cwd),
         "sarif": _display_path(settings.sarif, cwd),
     }
+    if report.confidence_interval is not None:
+        outputs["score-lower"] = f"{report.confidence_interval.lower:.2f}"
+        outputs["score-upper"] = f"{report.confidence_interval.upper:.2f}"
     with path.open("a", encoding="utf-8") as handle:
         for name, value in outputs.items():
             handle.write(f"{name}={value}\n")
@@ -363,6 +397,15 @@ def _render_summary(report: CompatibilityReport, settings: _ActionSettings, cwd:
         f"| Excluded calls | {report.excluded} |",
         f"| Compatible weight | {report.passing_weight:g}/{report.eligible_weight:g} |",
     ]
+    if report.confidence_interval is not None:
+        interval = report.confidence_interval
+        lines.append(
+            "| Score confidence | "
+            f"{interval.lower:.2f}-{interval.upper:.2f} "
+            f"({interval.confidence_level:.0%}, {interval.iterations} iterations) |"
+        )
+    if settings.score_tolerance:
+        lines.append(f"| Score tolerance | +/-{settings.score_tolerance:.2f} |")
     if report.sampling is not None:
         lines.extend(
             [

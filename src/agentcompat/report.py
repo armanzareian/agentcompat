@@ -99,6 +99,15 @@ def report_to_dict(report: CompatibilityReport) -> dict[str, Any]:
                 for stratum in report.sampling.strata
             ],
         }
+    if report.confidence_interval is not None:
+        payload["confidence_interval"] = {
+            "metric": report.confidence_interval.metric,
+            "confidence_level": report.confidence_interval.confidence_level,
+            "lower": report.confidence_interval.lower,
+            "upper": report.confidence_interval.upper,
+            "iterations": report.confidence_interval.iterations,
+            "seed": report.confidence_interval.seed,
+        }
     return payload
 
 
@@ -109,6 +118,14 @@ def render_text(report: CompatibilityReport) -> str:
         (f"Calls: {report.passed} passed, {report.broken} broken, {report.excluded} excluded"),
         (f"Observed weight: {report.passing_weight:g}/{report.eligible_weight:g} compatible"),
     ]
+    if report.confidence_interval is not None:
+        interval = report.confidence_interval
+        lines.append(
+            "Score confidence interval: "
+            f"{interval.lower:.2f}-{interval.upper:.2f} "
+            f"({interval.confidence_level:.0%}, "
+            f"{interval.iterations} iterations, seed {interval.seed})"
+        )
     if report.sampling is not None:
         lines.append(
             "Sampling: "

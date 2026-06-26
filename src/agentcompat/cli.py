@@ -65,6 +65,8 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--max-traces", type=int, default=10_000)
     check.add_argument("--sample-size", type=_positive_int)
     check.add_argument("--sample-seed", type=int, default=0)
+    check.add_argument("--bootstrap-iterations", type=_non_negative_int, default=0)
+    check.add_argument("--confidence-level", type=_confidence_level, default=0.95)
 
     audit = subparsers.add_parser(
         "audit",
@@ -94,6 +96,8 @@ def _run_check(args: argparse.Namespace) -> int:
         ),
         sample_size=args.sample_size,
         sample_seed=args.sample_seed,
+        bootstrap_iterations=args.bootstrap_iterations,
+        confidence_level=args.confidence_level,
     )
     if args.format == "json":
         print(json.dumps(report_to_dict(report), indent=2, sort_keys=True))
@@ -230,4 +234,18 @@ def _positive_int(value: str) -> int:
     parsed = int(value)
     if parsed <= 0:
         raise argparse.ArgumentTypeError("value must be a positive integer")
+    return parsed
+
+
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be non-negative")
+    return parsed
+
+
+def _confidence_level(value: str) -> float:
+    parsed = float(value)
+    if not 0 < parsed < 1:
+        raise argparse.ArgumentTypeError("confidence level must be greater than 0 and less than 1")
     return parsed

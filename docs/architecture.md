@@ -77,6 +77,12 @@ traces keep their original stream order for replay. The report records populatio
 population weight, sampled count, sampled weight, seed, and per-tool stratum metadata so a
 sampled score can be reproduced.
 
+When requested, the analyzer also computes a deterministic percentile bootstrap interval for
+the weighted score by resampling eligible replay results with replacement. The interval records
+the metric name, confidence level, iteration count, seed, and lower/upper score bounds. Exact
+checks can request the same interval, but it is primarily intended to make sampled replay
+uncertainty visible in CI and JSON reports.
+
 ### Change attribution
 
 `agentcompat.changes` compares normalized baseline and candidate bundles before replay. It emits
@@ -98,9 +104,9 @@ Evaluation manifests resolve fixture paths relative to the manifest file for por
 ### Presentation
 
 `agentcompat.report` is a pure rendering layer. JSON output uses stable field names for CI, while
-text output prioritizes the score, evidence denominator, breakage path, causal change ID, and
-ranked migration guidance. See [Change attribution](change-attribution.md) for the output
-contract.
+text output prioritizes the score, optional confidence interval, evidence denominator, breakage
+path, causal change ID, and ranked migration guidance. See
+[Change attribution](change-attribution.md) for the output contract.
 
 ## Failure model
 

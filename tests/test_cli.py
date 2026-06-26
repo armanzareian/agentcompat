@@ -165,6 +165,91 @@ class CheckCommandTests(unittest.TestCase):
         self.assertEqual(17, payload["sampling"]["seed"])
         self.assertEqual(2, len(payload["results"]))
 
+    def test_check_outputs_bootstrap_confidence_interval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline = root / "baseline.json"
+            candidate = root / "candidate.json"
+            traces = root / "traces.jsonl"
+            baseline.write_text(
+                json.dumps({"tools": [{"name": "search", "inputSchema": {"type": "object"}}]}),
+                encoding="utf-8",
+            )
+            candidate.write_text(
+                json.dumps(
+                    {
+                        "tools": [
+                            {
+                                "name": "search",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {"tenant_id": {"type": "string"}},
+                                    "required": ["tenant_id"],
+                                },
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            traces.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "trace_id": "pass",
+                                "tool": "search",
+                                "arguments": {"tenant_id": "a"},
+                                "weight": 2,
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "trace_id": "break",
+                                "tool": "search",
+                                "arguments": {},
+                                "weight": 1,
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "check",
+                        "--baseline",
+                        str(baseline),
+                        "--candidate",
+                        str(candidate),
+                        "--traces",
+                        str(traces),
+                        "--sample-size",
+                        "2",
+                        "--sample-seed",
+                        "17",
+                        "--bootstrap-iterations",
+                        "40",
+                        "--confidence-level",
+                        "0.8",
+                        "--format",
+                        "json",
+                        "--fail-under",
+                        "0",
+                    ]
+                )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(0, exit_code)
+        self.assertEqual("score", payload["confidence_interval"]["metric"])
+        self.assertEqual(0.8, payload["confidence_interval"]["confidence_level"])
+        self.assertEqual(40, payload["confidence_interval"]["iterations"])
+        self.assertEqual(17, payload["confidence_interval"]["seed"])
+
     def test_audit_reports_unsupported_schema_keywords(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             bundle = Path(directory) / "bundle.json"

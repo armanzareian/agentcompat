@@ -89,6 +89,16 @@ class SamplingSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class ScoreConfidenceInterval:
+    metric: str
+    confidence_level: float
+    lower: float
+    upper: float
+    iterations: int
+    seed: int
+
+
+@dataclass(frozen=True, slots=True)
 class CompatibilityReport:
     score: float
     passed: int
@@ -101,6 +111,7 @@ class CompatibilityReport:
     migration_plan: tuple[MigrationPlanItem, ...] = ()
     tool_summaries: tuple[ToolSummary, ...] = ()
     sampling: SamplingSummary | None = None
+    confidence_interval: ScoreConfidenceInterval | None = None
 
 
 @dataclass(frozen=True, slots=True)

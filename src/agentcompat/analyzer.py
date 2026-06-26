@@ -16,6 +16,7 @@ from agentcompat.models import (
     CompatibilityReport,
     SamplingStratum,
     SamplingSummary,
+    ScoreConfidenceInterval,
     ToolCall,
     ToolSummary,
     TraceResult,
@@ -35,7 +36,14 @@ def analyze_compatibility(
     *,
     sample_size: int | None = None,
     sample_seed: int = 0,
+    bootstrap_iterations: int = 0,
+    confidence_level: float = 0.95,
 ) -> CompatibilityReport:
+    if bootstrap_iterations < 0:
+        raise ValueError("bootstrap_iterations must be non-negative.")
+    if bootstrap_iterations and not 0 < confidence_level < 1:
+        raise ValueError("confidence_level must be greater than 0 and less than 1.")
+
     unsupported = audit_tool_bundle(baseline) + audit_tool_bundle(candidate)
     if unsupported:
         raise UnsupportedSchemaError(unsupported)
@@ -122,6 +130,14 @@ def analyze_compatibility(
         score = round((passing_weight / eligible_weight) * 100, 2)
 
     result_tuple = tuple(results)
+    confidence_interval = None
+    if bootstrap_iterations:
+        confidence_interval = _bootstrap_score_interval(
+            result_tuple,
+            iterations=bootstrap_iterations,
+            confidence_level=confidence_level,
+            seed=sample_seed,
+        )
     return CompatibilityReport(
         score,
         passed,
@@ -134,6 +150,7 @@ def analyze_compatibility(
         build_migration_plan(changes, result_tuple),
         _tool_summaries(tool_stats),
         sampling,
+        confidence_interval,
     )
 
 
@@ -292,6 +309,75 @@ def _allocate_remaining_quota(
                 return
         if not allocated:
             return
+
+
+def _bootstrap_score_interval(
+    results: tuple[TraceResult, ...],
+    *,
+    iterations: int,
+    confidence_level: float,
+    seed: int,
+) -> ScoreConfidenceInterval:
+    eligible = tuple(result for result in results if result.status in {"passed", "broken"})
+    if not eligible:
+        return ScoreConfidenceInterval(
+            metric="score",
+            confidence_level=confidence_level,
+            lower=0.0,
+            upper=0.0,
+            iterations=iterations,
+            seed=seed,
+        )
+
+    scores = sorted(
+        _bootstrap_score(eligible, seed=seed, iteration=iteration)
+        for iteration in range(iterations)
+    )
+    alpha = 1 - confidence_level
+    return ScoreConfidenceInterval(
+        metric="score",
+        confidence_level=confidence_level,
+        lower=round(_quantile(scores, alpha / 2), 2),
+        upper=round(_quantile(scores, 1 - (alpha / 2)), 2),
+        iterations=iterations,
+        seed=seed,
+    )
+
+
+def _bootstrap_score(
+    eligible: tuple[TraceResult, ...],
+    *,
+    seed: int,
+    iteration: int,
+) -> float:
+    passing_weight = 0.0
+    eligible_weight = 0.0
+    for draw in range(len(eligible)):
+        result = eligible[_bootstrap_index(seed, iteration, draw, len(eligible))]
+        eligible_weight += result.trace.weight
+        if result.status == "passed":
+            passing_weight += result.trace.weight
+    if not eligible_weight:
+        return 0.0
+    return (passing_weight / eligible_weight) * 100
+
+
+def _bootstrap_index(seed: int, iteration: int, draw: int, population: int) -> int:
+    digest = hashlib.sha256(f"{seed}\0bootstrap\0{iteration}\0{draw}".encode()).digest()
+    return int.from_bytes(digest[:8], "big") % population
+
+
+def _quantile(values: list[float], quantile: float) -> float:
+    if len(values) == 1:
+        return values[0]
+    position = quantile * (len(values) - 1)
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+    if lower_index == upper_index:
+        return values[lower_index]
+    lower = values[lower_index]
+    upper = values[upper_index]
+    return lower + (upper - lower) * (position - lower_index)
 
 
 def _tool_summaries(tool_stats: dict[str, _ToolStats]) -> tuple[ToolSummary, ...]:

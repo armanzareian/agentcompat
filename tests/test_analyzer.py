@@ -155,6 +155,53 @@ class AnalyzeCompatibilityTests(unittest.TestCase):
         self.assertEqual(3, sampling.sampled)
         self.assertEqual(17, sampling.seed)
 
+    def test_bootstraps_sampled_score_confidence_interval_deterministically(self) -> None:
+        baseline: dict[str, dict[str, Any]] = {"search": {"type": "object"}}
+        candidate: dict[str, dict[str, Any]] = {
+            "search": {
+                "type": "object",
+                "properties": {"tenant_id": {"type": "string"}},
+                "required": ["tenant_id"],
+            }
+        }
+        traces = [
+            ToolCall("pass-heavy", "search", {"tenant_id": "a"}, 4),
+            ToolCall("pass-light", "search", {"tenant_id": "b"}, 1),
+            ToolCall("break-heavy", "search", {}, 3),
+            ToolCall("break-light", "search", {}, 1),
+        ]
+
+        first = analyze_compatibility(
+            baseline,
+            candidate,
+            traces,
+            sample_size=4,
+            sample_seed=23,
+            bootstrap_iterations=80,
+            confidence_level=0.8,
+        )
+        second = analyze_compatibility(
+            baseline,
+            candidate,
+            traces,
+            sample_size=4,
+            sample_seed=23,
+            bootstrap_iterations=80,
+            confidence_level=0.8,
+        )
+
+        self.assertEqual(first.confidence_interval, second.confidence_interval)
+        assert first.confidence_interval is not None
+        interval = first.confidence_interval
+        self.assertEqual("score", interval.metric)
+        self.assertEqual(0.8, interval.confidence_level)
+        self.assertEqual(80, interval.iterations)
+        self.assertEqual(23, interval.seed)
+        self.assertLessEqual(0.0, interval.lower)
+        self.assertLessEqual(interval.lower, first.score)
+        self.assertLessEqual(first.score, interval.upper)
+        self.assertLessEqual(interval.upper, 100.0)
+
     def test_produces_actionable_repair_hints(self) -> None:
         baseline = {"search": {"type": "object"}}
         candidate = {

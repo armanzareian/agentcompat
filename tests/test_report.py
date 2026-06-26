@@ -12,6 +12,7 @@ from agentcompat.models import (
     SamplingStratum,
     SamplingSummary,
     SchemaChange,
+    ScoreConfidenceInterval,
     ToolCall,
     ToolSummary,
     TraceResult,
@@ -98,12 +99,21 @@ class ReportTests(unittest.TestCase):
                     ),
                 ),
             ),
+            confidence_interval=ScoreConfidenceInterval(
+                metric="score",
+                confidence_level=0.9,
+                lower=40.0,
+                upper=75.0,
+                iterations=200,
+                seed=17,
+            ),
         )
 
         rendered = render_text(report)
         payload = report_to_dict(report)
 
         self.assertIn("Score: 50.00/100", rendered)
+        self.assertIn("Score confidence interval: 40.00-75.00", rendered)
         self.assertIn("Sampling: 5/10 calls selected with seed 17", rendered)
         self.assertNotIn("PASSED passed", rendered)
         self.assertIn("BROKEN broken", rendered)
@@ -168,6 +178,17 @@ class ReportTests(unittest.TestCase):
                 ],
             },
             payload["sampling"],
+        )
+        self.assertEqual(
+            {
+                "metric": "score",
+                "confidence_level": 0.9,
+                "lower": 40.0,
+                "upper": 75.0,
+                "iterations": 200,
+                "seed": 17,
+            },
+            payload["confidence_interval"],
         )
 
 

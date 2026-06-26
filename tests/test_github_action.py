@@ -32,6 +32,9 @@ class GitHubActionTests(unittest.TestCase):
                         "fail_under": 80,
                         "sample_size": 1,
                         "sample_seed": 17,
+                        "bootstrap_iterations": 20,
+                        "confidence_level": 0.8,
+                        "score_tolerance": 5,
                         "changed_schema_discovery": {
                             "enabled": True,
                             "globs": ["schemas/*.json"],
@@ -64,13 +67,18 @@ class GitHubActionTests(unittest.TestCase):
             self.assertEqual(1, payload["summary"]["broken"])
             self.assertEqual(1, payload["sampling"]["sampled"])
             self.assertEqual(17, payload["sampling"]["seed"])
+            self.assertEqual(20, payload["confidence_interval"]["iterations"])
             summary_text = summary.read_text(encoding="utf-8")
             self.assertIn("AgentCompat compatibility", summary_text)
             self.assertIn("Score: 0.00/100", summary_text)
             self.assertIn("Sampling: 1/1 calls selected with seed 17", summary_text)
+            self.assertIn("Score confidence", summary_text)
+            self.assertIn("Score tolerance", summary_text)
             self.assertIn("[trace-1](#trace-trace-1)", summary_text)
             output_text = outputs.read_text(encoding="utf-8")
             self.assertIn("score=0.00", output_text)
+            self.assertIn("score-lower=", output_text)
+            self.assertIn("score-upper=", output_text)
             self.assertIn("broken=1", output_text)
             sarif_payload = json.loads(sarif.read_text(encoding="utf-8"))
             self.assertEqual("2.1.0", sarif_payload["version"])

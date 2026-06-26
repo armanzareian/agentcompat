@@ -57,6 +57,9 @@ The default policy file is `.agentcompat.json` when present. You can also pass a
   "max_traces": 10000,
   "sample_size": 1000,
   "sample_seed": 17,
+  "bootstrap_iterations": 1000,
+  "confidence_level": 0.95,
+  "score_tolerance": 5,
   "redact_paths": ["$.customer.email"],
   "redact_key_patterns": ["token|secret|api[_-]?key"],
   "changed_schema_discovery": {
@@ -81,6 +84,9 @@ Supported policy keys:
 - `max_traces`: positive trace count cap.
 - `sample_size`: optional deterministic weighted stratified sample size.
 - `sample_seed`: integer seed used when `sample_size` is set.
+- `bootstrap_iterations`: optional non-negative iteration count for score confidence intervals.
+- `confidence_level`: bootstrap interval level greater than `0` and less than `1`.
+- `score_tolerance`: optional reporting tolerance for sampled score comparisons.
 - `redact_paths`: exact argument JSON paths to redact before replay.
 - `redact_key_patterns`: regular expressions matching argument keys to redact.
 - `changed_schema_discovery.globs`: candidate schema globs used when `candidate` is omitted.
@@ -88,7 +94,10 @@ Supported policy keys:
 Every policy value can be overridden by action inputs. Newline-separated `redact-paths` and
 `redact-key-patterns` inputs are appended as repeated CLI flags.
 Sampled runs include the selected call count, population count, seed, and sampled weight in the
-job summary and JSON report.
+job summary and JSON report. Runs with `bootstrap_iterations` also include a score confidence
+interval in the job summary, JSON report, and optional confidence-bound outputs. `score_tolerance`
+is reported in the summary so teams can document the acceptable difference between sampled and
+exact validation checks; it does not change pass/fail policy.
 
 ## Outputs
 
@@ -98,6 +107,8 @@ The action writes these step outputs:
 - `passed`: count of eligible calls that remain candidate-compatible.
 - `broken`: count of eligible calls that fail under the candidate schema.
 - `excluded`: count of baseline-invalid or unknown-tool calls excluded from the score.
+- `score-lower`: lower bootstrap confidence bound when enabled.
+- `score-upper`: upper bootstrap confidence bound when enabled.
 - `report-json`: path to the machine-readable compatibility report.
 - `sarif`: path to the SARIF report.
 
