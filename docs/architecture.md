@@ -83,6 +83,12 @@ the metric name, confidence level, iteration count, seed, and lower/upper score 
 checks can request the same interval, but it is primarily intended to make sampled replay
 uncertainty visible in CI and JSON reports.
 
+The `benchmark` command uses the same validation rules on a deterministic synthetic schema
+evolution scenario. Exact benchmark replay is aggregated as a stream without retaining every
+trace result, then compared with a seeded weighted sample. The command reports elapsed time,
+peak traced Python allocation, exact and sampled scores, and whether both the memory ceiling and
+declared score tolerance were met.
+
 ### Change attribution
 
 `agentcompat.changes` compares normalized baseline and candidate bundles before replay. It emits

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from agentcompat.analyzer import analyze_compatibility
+from agentcompat.benchmark import render_benchmark_text, run_synthetic_benchmark
 from agentcompat.evaluation import evaluate_report
 from agentcompat.io import (
     TRACE_FORMATS,
@@ -38,6 +39,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_audit(args)
         if args.command == "eval":
             return _run_evaluation(args)
+        if args.command == "benchmark":
+            return _run_benchmark(args)
     except (InputError, UnsupportedSchemaError) as exc:
         print(f"agentcompat: {exc}", file=sys.stderr)
         return 2
@@ -78,6 +81,17 @@ def _build_parser() -> argparse.ArgumentParser:
     evaluate = subparsers.add_parser("eval", help="run a labeled evaluation suite")
     evaluate.add_argument("--suite", type=Path, required=True)
     evaluate.add_argument("--format", choices=("text", "json"), default="text")
+
+    benchmark = subparsers.add_parser(
+        "benchmark",
+        help="run a synthetic large-trace replay benchmark",
+    )
+    benchmark.add_argument("--calls", type=_positive_int, default=1_000_000)
+    benchmark.add_argument("--sample-size", type=_positive_int, default=10_000)
+    benchmark.add_argument("--sample-seed", type=int, default=17)
+    benchmark.add_argument("--score-tolerance", type=_score, default=2.0)
+    benchmark.add_argument("--max-memory-mib", type=_positive_float, default=512.0)
+    benchmark.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
 
@@ -196,6 +210,21 @@ def _evaluate_case(root: Path, raw_case: dict[str, object]) -> EvaluationMetrics
     return evaluate_report(report, expected)
 
 
+def _run_benchmark(args: argparse.Namespace) -> int:
+    payload = run_synthetic_benchmark(
+        call_count=args.calls,
+        sample_size=args.sample_size,
+        sample_seed=args.sample_seed,
+        score_tolerance=args.score_tolerance,
+        max_memory_mib=args.max_memory_mib,
+    )
+    if args.format == "json":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(render_benchmark_text(payload))
+    return 0 if payload["passed_policy"] else 1
+
+
 def _case_path(root: Path, case: dict[str, object], key: str) -> Path:
     value = case.get(key)
     if not isinstance(value, str):
@@ -248,4 +277,11 @@ def _confidence_level(value: str) -> float:
     parsed = float(value)
     if not 0 < parsed < 1:
         raise argparse.ArgumentTypeError("confidence level must be greater than 0 and less than 1")
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be positive")
     return parsed

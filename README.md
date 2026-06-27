@@ -132,6 +132,22 @@ weighted score. Bootstrap resamples the eligible sampled calls with replacement 
 seed and reports lower and upper score bounds in the JSON `confidence_interval` object and text
 output. `--confidence-level` defaults to `0.95`.
 
+To check large-population behavior without publishing private traces, run the synthetic benchmark:
+
+```bash
+agentcompat benchmark \
+  --calls 1000000 \
+  --sample-size 10000 \
+  --sample-seed 17 \
+  --score-tolerance 2 \
+  --max-memory-mib 512 \
+  --format json
+```
+
+The benchmark streams one million deterministic tool calls through exact aggregate replay,
+scores a seeded weighted sample, reports the exact-vs-sampled score delta, and enforces the
+declared traced-memory ceiling. Exit code `1` means the score delta or memory ceiling failed.
+
 Trace files can also use provider-shaped records:
 
 ```bash
