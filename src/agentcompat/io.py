@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
+from agentcompat.extensions import ExtensionRegistry, SchemaSource, ToolBundle, TraceAdapter
 from agentcompat.models import ToolCall
 
 MAX_INPUT_BYTES = 10 * 1024 * 1024
 TRACE_FORMATS = frozenset({"canonical", "openai", "anthropic", "mcp", "langchain"})
+SCHEMA_SOURCES = frozenset({"json"})
 _SCHEMA_MAP_KEYWORDS = frozenset({"$defs", "definitions", "properties"})
 _SCHEMA_ARRAY_KEYWORDS = frozenset({"allOf", "anyOf", "oneOf", "prefixItems"})
 _SCHEMA_VALUE_KEYWORDS = frozenset(
@@ -74,6 +76,7 @@ def read_traces(
     max_traces: int = 10_000,
     trace_format: str = "canonical",
     redaction: RedactionConfig | None = None,
+    extensions: ExtensionRegistry | None = None,
 ) -> list[ToolCall]:
     return list(
         iter_traces(
@@ -81,6 +84,7 @@ def read_traces(
             max_traces=max_traces,
             trace_format=trace_format,
             redaction=redaction,
+            extensions=extensions,
         )
     )
 
@@ -91,9 +95,11 @@ def iter_traces(
     max_traces: int = 10_000,
     trace_format: str = "canonical",
     redaction: RedactionConfig | None = None,
+    extensions: ExtensionRegistry | None = None,
 ) -> Iterator[ToolCall]:
-    if trace_format not in TRACE_FORMATS:
-        supported = ", ".join(sorted(TRACE_FORMATS))
+    adapter = _trace_adapter(trace_format, extensions)
+    if adapter is None:
+        supported = ", ".join(_available_trace_formats(extensions))
         raise InputError(f"Unsupported trace format {trace_format!r}; choose one of {supported}.")
 
     _check_file_size(path)
@@ -109,7 +115,12 @@ def iter_traces(
                 payload = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise InputError(f"Invalid JSON on line {line_number}: {exc.msg}.") from exc
-            for trace in _iter_trace_records(payload, line_number, trace_format):
+            for trace in adapter(payload, line_number):
+                if not isinstance(trace, ToolCall):
+                    raise InputError(
+                        f"Trace adapter {trace_format!r} yielded a non-ToolCall record "
+                        f"on line {line_number}."
+                    )
                 if trace_count >= max_traces:
                     raise InputError(f"Trace file exceeds the limit of {max_traces} records.")
                 trace_count += 1
@@ -119,11 +130,29 @@ def iter_traces(
         raise InputError("Trace file contains no records.")
 
 
-def load_tool_bundle(path: Path) -> dict[str, dict[str, Any]]:
+def load_tool_bundle(
+    path: Path,
+    *,
+    schema_source: str = "json",
+    extensions: ExtensionRegistry | None = None,
+) -> ToolBundle:
+    if schema_source != "json":
+        source = _schema_source(schema_source, extensions)
+        if source is None:
+            supported = ", ".join(_available_schema_sources(extensions))
+            raise InputError(
+                f"Unsupported schema source {schema_source!r}; choose one of {supported}."
+            )
+        return _validate_loaded_tool_bundle(source(path), schema_source)
+
+    return _load_json_tool_bundle(path)
+
+
+def _load_json_tool_bundle(path: Path) -> ToolBundle:
     document = load_json(path)
     tools = parse_tool_bundle(document)
     resolver = _LocalReferenceResolver(path, document)
-    resolved_tools: dict[str, dict[str, Any]] = {}
+    resolved_tools: ToolBundle = {}
     for name, schema in tools.items():
         resolved = resolver.resolve(
             schema,
@@ -164,17 +193,64 @@ def _parse_trace(payload: Any, line_number: int) -> ToolCall:
     return ToolCall(trace_id, tool, arguments, float(weight))
 
 
-def _iter_trace_records(payload: Any, line_number: int, trace_format: str) -> Iterator[ToolCall]:
-    if trace_format == "canonical":
-        yield _parse_trace(payload, line_number)
-    elif trace_format == "openai":
-        yield from _iter_openai_traces(payload, line_number)
-    elif trace_format == "anthropic":
-        yield from _iter_anthropic_traces(payload, line_number)
-    elif trace_format == "mcp":
-        yield from _iter_mcp_traces(payload, line_number)
-    elif trace_format == "langchain":
-        yield from _iter_langchain_traces(payload, line_number)
+def _iter_canonical_traces(payload: Any, line_number: int) -> Iterator[ToolCall]:
+    yield _parse_trace(payload, line_number)
+
+
+def _trace_adapter(
+    trace_format: str,
+    extensions: ExtensionRegistry | None,
+) -> TraceAdapter | None:
+    builtin_adapters: dict[str, TraceAdapter] = {
+        "canonical": _iter_canonical_traces,
+        "openai": _iter_openai_traces,
+        "anthropic": _iter_anthropic_traces,
+        "mcp": _iter_mcp_traces,
+        "langchain": _iter_langchain_traces,
+    }
+    if trace_format in builtin_adapters:
+        return builtin_adapters[trace_format]
+    if extensions is None:
+        return None
+    return extensions.trace_adapters.get(trace_format)
+
+
+def _schema_source(
+    schema_source: str,
+    extensions: ExtensionRegistry | None,
+) -> SchemaSource | None:
+    if extensions is None:
+        return None
+    return extensions.schema_sources.get(schema_source)
+
+
+def _available_trace_formats(extensions: ExtensionRegistry | None) -> tuple[str, ...]:
+    names = set(TRACE_FORMATS)
+    if extensions is not None:
+        names.update(extensions.trace_adapter_names)
+    return tuple(sorted(names))
+
+
+def _available_schema_sources(extensions: ExtensionRegistry | None) -> tuple[str, ...]:
+    names = set(SCHEMA_SOURCES)
+    if extensions is not None:
+        names.update(extensions.schema_source_names)
+    return tuple(sorted(names))
+
+
+def _validate_loaded_tool_bundle(tools: object, source_name: str) -> ToolBundle:
+    if not isinstance(tools, dict) or not tools:
+        raise InputError(f"Schema source {source_name!r} must return a non-empty tool bundle.")
+    normalized: ToolBundle = {}
+    for name, schema in tools.items():
+        if not isinstance(name, str) or not name.strip():
+            raise InputError(f"Schema source {source_name!r} returned an invalid tool name.")
+        if not isinstance(schema, dict):
+            raise InputError(
+                f"Schema source {source_name!r} returned an invalid schema for {name!r}."
+            )
+        normalized[name] = schema
+    return normalized
 
 
 def _iter_openai_traces(payload: Any, line_number: int) -> Iterator[ToolCall]:

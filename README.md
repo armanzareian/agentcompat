@@ -25,6 +25,7 @@ for local development and CI.
   weighted, deduplicated migration work.
 - **Trace adapters with redaction:** read common OpenAI, Anthropic, MCP, and LangChain tool-call
   records while scrubbing configured fields before replay.
+- **Typed extension API:** plug in custom trace adapters and schema sources from Python code.
 - **Seeded sampled replay:** score deterministic weighted samples with optional bootstrap
   confidence intervals when trace populations are too large for exact local review.
 - **Measurable evaluation:** labeled suites report precision, recall, F1, and root-cause accuracy.
@@ -176,6 +177,10 @@ validation reports can only include the replacement value. Adapter errors identi
 line and field without echoing malformed argument payloads. Non-tool rows in provider stream
 logs are skipped; a file with no tool calls is rejected.
 
+Programmatic users can register custom trace adapters and schema sources with the typed
+`ExtensionRegistry` API. See [Extension API](docs/extensions.md) for the stable contracts and
+examples.
+
 ## Output
 
 ```text
@@ -251,7 +256,7 @@ flowchart LR
 
 The implementation is split into focused modules for input normalization, schema validation,
 replay analysis, evaluation, and presentation. See [Architecture](docs/architecture.md) for
-contracts and extension points.
+contracts and [Extension API](docs/extensions.md) for typed integration points.
 
 ## Development
 

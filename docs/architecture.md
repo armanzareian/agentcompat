@@ -27,6 +27,13 @@ parse errors report the line and source field that failed without echoing the ma
 payload. Non-tool provider stream events are ignored, and files containing no tool calls are
 rejected.
 
+Programmatic integrations can register typed trace adapters and schema sources with
+`agentcompat.ExtensionRegistry`. Custom trace adapters receive one parsed JSON Lines record and
+return canonical `ToolCall` objects; custom schema sources return a normalized map from tool name
+to JSON Schema. The built-in CLI does not dynamically load extensions, and custom schemas still
+pass through the same unsupported-semantics audit before replay. See [Extension API](extensions.md)
+for the public contracts.
+
 ### Schema validation
 
 `agentcompat.validator` implements the common assertion subset used by function tools. Every

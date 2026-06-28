@@ -41,6 +41,9 @@ Repository = "https://github.com/armanzareian/agentcompat"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+agentcompat = ["py.typed"]
+
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers -ra"
 testpaths = ["tests"]
